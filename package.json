@@ -1,12 +1,39 @@
 {
-  "name": "14.elastic_api",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+    "name": "metrics-api",
+    "version": "1.0.0",
+    "description": "Elasticsearch Metrics API Server",
+    "main": "dist/server.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/server.js",
+        "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+        "watch": "tsc -w",
+        "test": "jest"
+    },
+    "dependencies": {
+        "@elastic/elasticsearch": "^8.11.0",
+        "express": "^4.18.2",
+        "dotenv": "^16.3.1",
+        "joi": "^17.11.0",
+        "cors": "^2.8.5",
+        "helmet": "^7.1.0",
+        "compression": "^1.7.4",
+        "winston": "^3.11.0"
+    },
+    "devDependencies": {
+        "@types/express": "^4.17.21",
+        "@types/node": "^20.10.5",
+        "@types/cors": "^2.8.17",
+        "@types/compression": "^1.7.5",
+        "@types/joi": "^17.2.3",
+        "typescript": "^5.3.3",
+        "ts-node": "^10.9.2",
+        "ts-node-dev": "^2.0.0",
+        "jest": "^29.7.0",
+        "@types/jest": "^29.5.11",
+        "ts-jest": "^29.1.1"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
 }
