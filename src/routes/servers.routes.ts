@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import metricsService from '../services/MetricsService';
+import logService from '../services/LogService';
 import { asyncHandler } from '../middleware/errorHandler';
 import {
   validateTimeSeries,
@@ -150,6 +151,35 @@ router.post(
       meta: {
         total: metrics.length,
         requested: ips.length
+      }
+    } as ApiResponse);
+  })
+);
+
+/**
+ * GET /api/servers/:ip/logs
+ * 서버 로그 페이징 조회
+ * query: timeRange, page, limit
+ */
+router.get(
+  '/:ip/logs',
+  validateServerMetrics,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { ip } = req.params;
+    const timeRange = (req.query.timeRange as string) || 'now-1h';
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    const result = await logService.getServerLogs(ip, timeRange, page, limit);
+
+    return res.json({
+      success: true,
+      data: result.logs,
+      meta: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages
       }
     } as ApiResponse);
   })

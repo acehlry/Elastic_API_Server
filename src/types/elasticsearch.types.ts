@@ -1,5 +1,6 @@
 export interface SearchQuery {
     size?: number;
+    from?: number;
     query: {
         bool: {
             must: Array<Record<string, any>>;

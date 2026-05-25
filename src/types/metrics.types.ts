@@ -40,6 +40,24 @@ export interface ServerInfo {
     serviceType?: string;
 }
 
+export interface LogEntry {
+    timestamp: string;
+    level: string;
+    message: string;
+    parsedMessage?: string;
+    service?: string;
+    hostname?: string;
+    ip?: string;
+}
+
+export interface LogPage {
+    logs: LogEntry[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+}
+
 export interface ServerTimeSeries {
     hostname: string;
     ip: string;

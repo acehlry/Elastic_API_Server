@@ -167,6 +167,21 @@ export class QueryBuilder {
     /**
      * 다중 서버 메트릭 쿼리 빌드
      */
+    static buildServerLogs(
+        ip: string,
+        timeRange: string,
+        page: number,
+        limit: number,
+    ): SearchQuery {
+        const query = this.build('server-logs', [
+            this.mustClauses.rangeTime(timeRange),
+            this.mustClauses.term('host.ip', ip),
+        ]);
+        query.size = limit;
+        query.from = (page - 1) * limit;
+        return query;
+    }
+
     static buildMultipleHosts(
         ips: string[],
         timeRange: string = 'now-1h',
