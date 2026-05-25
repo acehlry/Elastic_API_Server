@@ -147,6 +147,17 @@ export class QueryBuilder {
     /**
      * 전체 서버 목록 쿼리 빌드
      */
+    static buildAllServersTimeSeries(
+        timeRange: string = 'now-1h',
+        interval: string = '5m',
+    ): SearchQuery {
+        return this.build(
+            'all-servers-timeseries',
+            [this.mustClauses.rangeTime(timeRange)],
+            { interval, start_time: timeRange, end_time: 'now' },
+        );
+    }
+
     static buildAllServers(timeRange: string = 'now-15m'): SearchQuery {
         return this.build('all-servers', [
             this.mustClauses.rangeTime(timeRange),

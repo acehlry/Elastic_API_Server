@@ -40,6 +40,12 @@ export interface ServerInfo {
     serviceType?: string;
 }
 
+export interface ServerTimeSeries {
+    hostname: string;
+    ip: string;
+    timeSeries: TimeSeriesData[];
+}
+
 export interface ServerOverview {
     hostname: string;
     ip: string;

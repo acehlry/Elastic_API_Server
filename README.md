@@ -41,15 +41,27 @@ ELATIC_API_SERVER
 # API
 
 ```
-// 전체 서버 목록
+[전체 서버 목록]
 GET	 /api/servers
-// 서버 상세
+
+[전체 서버 최신 메트릭]
+GET	/api/servers/metrics/latest
+
+[전체 서버 시계열 (서버별로 묶음)]
+GET	/api/servers/metrics/timeseries
+
+[서버 상세]
 GET	 /api/servers/:ip
-// 최신 메트릭
+
+[최신 메트릭]
 GET	 /api/servers/:ip/metrics/latest
-// 시계열
+
+[시계열]
 GET	 /api/servers/:ip/metrics/timeseries
-다중 서버
+
+[다중 서버]
 POST /api/servers/metrics/batch
-{ ips: [...] }
+{
+    ips: [...]
+}
 ```

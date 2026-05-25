@@ -6,6 +6,7 @@ import {
   TimeSeriesData,
   AnomalyData,
   ServerOverview,
+  ServerTimeSeries,
   MetricType,
   AnomalyLevel,
   Thresholds,
@@ -14,6 +15,8 @@ import {
 import logger from '../config/logger';
 
 const HEARTBEAT_THRESHOLD_MS = 5 * 60 * 1000;
+
+const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 class MetricsService {
   private thresholds: Record<MetricType, Thresholds>;
@@ -92,6 +95,56 @@ class MetricsService {
   }
 
   /**
+   * 전체 서버 최신 메트릭 조회 (MetricData 포맷)
+   */
+  async getAllServersLatestMetrics(timeRange: string = 'now-15m'): Promise<MetricData[]> {
+    try {
+      const query = QueryBuilder.buildAllServers(timeRange);
+      const response = await elasticsearchService.search(query);
+      const hostBuckets = elasticsearchService.extractBuckets(response, 'by_host');
+
+      return hostBuckets
+        .map(hostBucket => {
+          const metricsetBuckets: Bucket[] = hostBucket.by_metricset?.buckets || [];
+          return this.parseMetricDataFromBuckets(metricsetBuckets);
+        })
+        .filter((data): data is MetricData => data !== null);
+    } catch (error) {
+      logger.error('Failed to get all servers latest metrics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 전체 서버 시계열 조회 (서버별로 묶어서 반환)
+   */
+  async getAllServersTimeSeries(
+    timeRange: string = 'now-1h',
+    interval: string = '5m'
+  ): Promise<ServerTimeSeries[]> {
+    try {
+      Validator.validateQuerySize(timeRange, interval);
+      const query = QueryBuilder.buildAllServersTimeSeries(timeRange, interval);
+      const response = await elasticsearchService.search(query);
+      const hostBuckets = elasticsearchService.extractBuckets(response, 'by_host');
+
+      return hostBuckets.map(hostBucket => {
+        const hostInfoSource = hostBucket.host_info?.hits?.hits?.[0]?._source;
+        const timeBuckets: Bucket[] = hostBucket.time_buckets?.buckets || [];
+
+        return {
+          hostname: hostBucket.key as string,
+          ip: this.extractIPv4(hostInfoSource?.host?.ip),
+          timeSeries: this.parseTimeSeriesBuckets(timeBuckets)
+        };
+      });
+    } catch (error) {
+      logger.error('Failed to get all servers time series:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 시계열 데이터 조회
    */
   async getTimeSeriesData(
@@ -163,7 +216,7 @@ class MetricsService {
           faultLevel: this.getFaultLevel(level),
           remarks: this.getRemarks(metricType, value),
           regDt: source['@timestamp'] || '',
-          value: value * 100
+          value: r2(value * 100)
         });
       }
 
@@ -217,13 +270,13 @@ class MetricsService {
       hostname: baseSource.host?.name || '',
       ip: this.extractIPv4(baseSource.host?.ip),
       cpu: cpuSource?.system?.cpu?.total?.norm?.pct != null
-        ? cpuSource.system.cpu.total.norm.pct * 100
+        ? r2(cpuSource.system.cpu.total.norm.pct * 100)
         : undefined,
       memory: memorySource?.system?.memory?.used?.pct != null
-        ? memorySource.system.memory.used.pct * 100
+        ? r2(memorySource.system.memory.used.pct * 100)
         : undefined,
       disk: diskSource?.system?.filesystem?.used?.pct != null
-        ? diskSource.system.filesystem.used.pct * 100
+        ? r2(diskSource.system.filesystem.used.pct * 100)
         : undefined,
       load1: cpuSource?.system?.load?.['1'],
       load5: cpuSource?.system?.load?.['5'],
@@ -248,11 +301,11 @@ class MetricsService {
   private parseTimeSeriesBuckets(buckets: Bucket[]): TimeSeriesData[] {
     return buckets.map(bucket => ({
       timestamp: bucket.key_as_string || String(bucket.key),
-      cpu: (bucket.avg_cpu?.value || 0) * 100,
-      memory: (bucket.avg_memory?.value || 0) * 100,
-      disk: (bucket.avg_disk?.value || 0) * 100,
-      maxCpu: (bucket.max_cpu?.value || 0) * 100,
-      maxMemory: (bucket.max_memory?.value || 0) * 100
+      cpu: r2((bucket.avg_cpu?.value || 0) * 100),
+      memory: r2((bucket.avg_memory?.value || 0) * 100),
+      disk: r2((bucket.avg_disk?.value || 0) * 100),
+      maxCpu: r2((bucket.max_cpu?.value || 0) * 100),
+      maxMemory: r2((bucket.max_memory?.value || 0) * 100)
     }));
   }
 

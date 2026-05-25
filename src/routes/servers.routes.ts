@@ -29,6 +29,45 @@ router.get(
 );
 
 /**
+ * GET /api/servers/metrics/latest
+ * 감지 중인 전체 서버 최신 메트릭
+ */
+router.get(
+  '/metrics/latest',
+  asyncHandler(async (req: Request, res: Response) => {
+    const timeRange = (req.query.timeRange as string) || 'now-15m';
+
+    const metrics = await metricsService.getAllServersLatestMetrics(timeRange);
+
+    return res.json({
+      success: true,
+      data: metrics,
+      meta: { total: metrics.length }
+    } as ApiResponse);
+  })
+);
+
+/**
+ * GET /api/servers/metrics/timeseries
+ * 감지 중인 전체 서버 시계열 (서버별로 묶어서 반환)
+ */
+router.get(
+  '/metrics/timeseries',
+  asyncHandler(async (req: Request, res: Response) => {
+    const timeRange = (req.query.timeRange as string) || 'now-1h';
+    const interval = (req.query.interval as string) || '5m';
+
+    const data = await metricsService.getAllServersTimeSeries(timeRange, interval);
+
+    return res.json({
+      success: true,
+      data,
+      meta: { total: data.length, timeRange, interval }
+    } as ApiResponse);
+  })
+);
+
+/**
  * GET /api/servers/:ip/metrics/latest
  * 서버의 최신 메트릭 조회
  */

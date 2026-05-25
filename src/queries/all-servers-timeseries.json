@@ -1,0 +1,51 @@
+{
+  "size": 0,
+  "query": {
+    "bool": {
+      "must": [],
+      "filter": [
+        {
+          "terms": {
+            "metricset.name": ["cpu", "memory", "filesystem"]
+          }
+        }
+      ]
+    }
+  },
+  "aggs": {
+    "by_host": {
+      "terms": {
+        "field": "host.name",
+        "size": 1000
+      },
+      "aggs": {
+        "host_info": {
+          "top_hits": {
+            "size": 1,
+            "sort": [{ "@timestamp": { "order": "desc" } }],
+            "_source": {
+              "includes": ["host.name", "host.ip"]
+            }
+          }
+        },
+        "time_buckets": {
+          "date_histogram": {
+            "field": "@timestamp",
+            "fixed_interval": "{{interval}}",
+            "extended_bounds": {
+              "min": "{{start_time}}",
+              "max": "{{end_time}}"
+            }
+          },
+          "aggs": {
+            "avg_cpu": { "avg": { "field": "system.cpu.total.norm.pct" } },
+            "avg_memory": { "avg": { "field": "system.memory.used.pct" } },
+            "avg_disk": { "avg": { "field": "system.filesystem.used.pct" } },
+            "max_cpu": { "max": { "field": "system.cpu.total.norm.pct" } },
+            "max_memory": { "max": { "field": "system.memory.used.pct" } }
+          }
+        }
+      }
+    }
+  }
+}
