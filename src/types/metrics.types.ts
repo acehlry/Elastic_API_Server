@@ -8,6 +8,8 @@ export interface MetricData {
     load1?: number;
     load5?: number;
     load15?: number;
+    networkIn?: number;
+    networkOut?: number;
 }
 
 export interface TimeSeriesData {
@@ -17,6 +19,8 @@ export interface TimeSeriesData {
     disk: number;
     maxCpu: number;
     maxMemory: number;
+    networkIn: number;
+    networkOut: number;
 }
 
 export interface AnomalyData {
@@ -77,6 +81,8 @@ export interface ServerOverview {
     load1?: number;
     load5?: number;
     load15?: number;
+    networkIn?: number;
+    networkOut?: number;
 }
 
 export interface QueryParams {

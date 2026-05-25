@@ -6,7 +6,7 @@
       "filter": [
         {
           "terms": {
-            "metricset.name": ["cpu", "memory", "filesystem"]
+            "metricset.name": ["cpu", "memory", "filesystem", "network"]
           }
         }
       ]
@@ -27,7 +27,9 @@
         "avg_memory": { "avg": { "field": "system.memory.used.pct" } },
         "avg_disk": { "avg": { "field": "system.filesystem.used.pct" } },
         "max_cpu": { "max": { "field": "system.cpu.total.norm.pct" } },
-        "max_memory": { "max": { "field": "system.memory.used.pct" } }
+        "max_memory": { "max": { "field": "system.memory.used.pct" } },
+        "sum_network_in": { "sum": { "field": "system.network.in.bytes" } },
+        "sum_network_out": { "sum": { "field": "system.network.out.bytes" } }
       }
     }
   }

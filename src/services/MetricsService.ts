@@ -257,6 +257,7 @@ class MetricsService {
     const cpuBucket = buckets.find(b => b.key === 'cpu');
     const memoryBucket = buckets.find(b => b.key === 'memory');
     const diskBucket = buckets.find(b => b.key === 'filesystem');
+    const networkBucket = buckets.find(b => b.key === 'network');
 
     const cpuSource = cpuBucket?.latest?.hits?.hits?.[0]?._source;
     const memorySource = memoryBucket?.latest?.hits?.hits?.[0]?._source;
@@ -264,6 +265,9 @@ class MetricsService {
 
     const baseSource = cpuSource || memorySource || diskSource;
     if (!baseSource) return null;
+
+    const networkIn = networkBucket?.network_in_total?.value;
+    const networkOut = networkBucket?.network_out_total?.value;
 
     return {
       timestamp: baseSource['@timestamp'] || '',
@@ -280,7 +284,9 @@ class MetricsService {
         : undefined,
       load1: cpuSource?.system?.load?.['1'],
       load5: cpuSource?.system?.load?.['5'],
-      load15: cpuSource?.system?.load?.['15']
+      load15: cpuSource?.system?.load?.['15'],
+      networkIn: networkIn != null ? r2(networkIn) : undefined,
+      networkOut: networkOut != null ? r2(networkOut) : undefined
     };
   }
 
@@ -305,7 +311,9 @@ class MetricsService {
       memory: r2((bucket.avg_memory?.value || 0) * 100),
       disk: r2((bucket.avg_disk?.value || 0) * 100),
       maxCpu: r2((bucket.max_cpu?.value || 0) * 100),
-      maxMemory: r2((bucket.max_memory?.value || 0) * 100)
+      maxMemory: r2((bucket.max_memory?.value || 0) * 100),
+      networkIn: r2(bucket.sum_network_in?.value || 0),
+      networkOut: r2(bucket.sum_network_out?.value || 0)
     }));
   }
 

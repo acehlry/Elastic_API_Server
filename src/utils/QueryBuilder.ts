@@ -172,11 +172,18 @@ export class QueryBuilder {
         timeRange: string,
         page: number,
         limit: number,
+        levels?: string[],
     ): SearchQuery {
-        const query = this.build('server-logs', [
+        const mustClauses = [
             this.mustClauses.rangeTime(timeRange),
             this.mustClauses.term('host.ip', ip),
-        ]);
+        ];
+
+        if (levels && levels.length > 0) {
+            mustClauses.push(this.mustClauses.terms('log_level.keyword', levels));
+        }
+
+        const query = this.build('server-logs', mustClauses);
         query.size = limit;
         query.from = (page - 1) * limit;
         return query;

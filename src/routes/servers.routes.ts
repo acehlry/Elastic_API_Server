@@ -169,8 +169,12 @@ router.get(
     const timeRange = (req.query.timeRange as string) || 'now-1h';
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
+    const levels = (req.query.level as string)
+      ?.split(',')
+      .map(l => l.trim())
+      .filter(Boolean);
 
-    const result = await logService.getServerLogs(ip, timeRange, page, limit);
+    const result = await logService.getServerLogs(ip, timeRange, page, limit, levels);
 
     return res.json({
       success: true,

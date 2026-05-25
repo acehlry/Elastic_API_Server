@@ -38,7 +38,7 @@ ELATIC_API_SERVER
 └── nodemon.json
 ```
 
-# API
+# API - 메트릭
 
 ```
 [전체 서버 목록]
@@ -64,4 +64,20 @@ POST /api/servers/metrics/batch
 {
     ips: [...]
 }
+```
+
+# API - 로그
+
+```
+# 로그
+GET /api/servers/192.168.0.10/logs?timeRange=now-1h&page=1&limit=50
+
+# ERROR만
+GET /api/servers/192.168.0.10/logs?level=error
+
+# WARN, ERROR 복수
+GET /api/servers/192.168.0.10/logs?level=warn,error
+
+# INFO + 페이징 + 시간 범위
+GET /api/servers/192.168.0.10/logs?level=info&timeRange=now-3h&page=2&limit=100
 ```

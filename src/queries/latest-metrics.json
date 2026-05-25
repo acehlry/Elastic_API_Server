@@ -6,7 +6,7 @@
       "filter": [
         {
           "terms": {
-            "metricset.name": ["cpu", "memory", "filesystem"]
+            "metricset.name": ["cpu", "memory", "filesystem", "network"]
           }
         }
       ]
@@ -16,7 +16,7 @@
     "by_metricset": {
       "terms": {
         "field": "metricset.name",
-        "include": ["cpu", "memory", "filesystem"]
+        "include": ["cpu", "memory", "filesystem", "network"]
       },
       "aggs": {
         "latest": {
@@ -39,6 +39,12 @@
               ]
             }
           }
+        },
+        "network_in_total": {
+          "sum": { "field": "system.network.in.bytes" }
+        },
+        "network_out_total": {
+          "sum": { "field": "system.network.out.bytes" }
         }
       }
     }

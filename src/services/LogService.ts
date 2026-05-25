@@ -15,12 +15,17 @@ class LogService {
     timeRange: string = 'now-1h',
     page: number = 1,
     limit: number = 50,
+    levels?: string[],
   ): Promise<LogPage> {
     const safeLimit = Math.min(limit, MAX_LIMIT);
     const safePage = Math.max(1, page);
+    const normalizedLevels = levels?.map(l => l.toUpperCase()).filter(Boolean);
 
     try {
-      const query = QueryBuilder.buildServerLogs(ip, timeRange, safePage, safeLimit);
+      const query = QueryBuilder.buildServerLogs(
+        ip, timeRange, safePage, safeLimit,
+        normalizedLevels?.length ? normalizedLevels : undefined,
+      );
       const response = await elasticsearchService.search(query, LOG_INDEX);
 
       const total = typeof response.hits.total === 'number'
