@@ -1,26 +1,39 @@
-import { Client } from '@elastic/elasticsearch';
+import { Client, ClientOptions } from '@elastic/elasticsearch';
+import fs from 'fs';
+import path from 'path';
 import dotenv from 'dotenv';
-import { ElasticsearchConfig } from '../types';
 
 dotenv.config();
 
-const config: ElasticsearchConfig = {
-    node: process.env.ES_NODE || 'http://localhost:9200',
-    auth: {
-        username: process.env.ES_USERNAME || 'elastic',
-        password: process.env.ES_PASSWORD || 'changeme',
-    },
-    maxRetries: 5,
-    requestTimeout: 60000,
+const buildClientOptions = (): ClientOptions => {
+    const options: ClientOptions = {
+        node: process.env.ES_NODE || 'http://localhost:9200',
+        auth: {
+            username: process.env.ES_USERNAME || 'elastic',
+            password: process.env.ES_PASSWORD || 'changeme',
+        },
+        maxRetries: 5,
+        requestTimeout: 60000,
+    };
+
+    if (process.env.ES_SSL_ENABLED === 'true') {
+        const caPath = path.resolve(
+            process.cwd(),
+            process.env.ES_CA_CERT_PATH || './http_ca.crt',
+        );
+        const rejectUnauthorized = process.env.ES_SSL_VERIFY !== 'false';
+
+        options.tls = {
+            rejectUnauthorized,
+            ...(fs.existsSync(caPath) && { ca: fs.readFileSync(caPath) }),
+        };
+    }
+
+    return options;
 };
 
-const client = new Client({
-    ...config,
-    sniffOnStart: true,
-    sniffInterval: 300000,
-});
+const client = new Client(buildClientOptions());
 
-// 연결 테스트
 client
     .ping()
     .then(() => console.log('✅ Elasticsearch connected'))

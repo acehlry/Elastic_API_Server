@@ -3,7 +3,7 @@ import { QueryParams } from '../types';
 
 const schemas = {
     timeSeries: Joi.object({
-        hostname: Joi.string().required(),
+        ip: Joi.string().ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' }).required(),
         timeRange: Joi.string()
             .pattern(/^now-\d+[mhd]$/)
             .default('now-1h'),
@@ -13,7 +13,7 @@ const schemas = {
     }),
 
     serverMetrics: Joi.object({
-        hostname: Joi.string().required(),
+        ip: Joi.string().ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' }).required(),
     }),
 
     anomalyDetection: Joi.object({
@@ -53,8 +53,8 @@ export class Validator {
         return this.validate<Required<QueryParams>>(schemas.timeSeries, data);
     }
 
-    static serverMetrics(data: QueryParams): { hostname: string } {
-        return this.validate<{ hostname: string }>(schemas.serverMetrics, data);
+    static serverMetrics(data: QueryParams): { ip: string } {
+        return this.validate<{ ip: string }>(schemas.serverMetrics, data);
     }
 
     static anomalyDetection(

@@ -1,13 +1,3 @@
-export interface ElasticsearchConfig {
-    node: string;
-    auth?: {
-        username: string;
-        password: string;
-    };
-    maxRetries?: number;
-    requestTimeout?: number;
-}
-
 export interface SearchQuery {
     size?: number;
     query: {

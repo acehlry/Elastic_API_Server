@@ -85,3 +85,5 @@ pids
 
 # Build artifacts
 lib-cov
+
+*.crt

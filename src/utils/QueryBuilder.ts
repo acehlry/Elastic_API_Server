@@ -59,6 +59,10 @@ export class QueryBuilder {
         host(hostname: string): MustClause {
             return this.term('host.name', hostname);
         },
+
+        hostByIp(ip: string): MustClause {
+            return this.term('host.ip', ip);
+        },
     };
 
     /**
@@ -93,7 +97,7 @@ export class QueryBuilder {
      * 시계열 쿼리 빌드
      */
     static buildTimeSeries(
-        hostname: string,
+        ip: string,
         timeRange: string,
         interval: string = '5m',
     ): SearchQuery {
@@ -101,7 +105,7 @@ export class QueryBuilder {
             'time-series',
             [
                 this.mustClauses.rangeTime(timeRange),
-                this.mustClauses.host(hostname),
+                this.mustClauses.hostByIp(ip),
             ],
             {
                 interval,
@@ -118,22 +122,47 @@ export class QueryBuilder {
         metricType: MetricType,
         timeRange: string = 'now-5m',
     ): SearchQuery {
-        const metricMethod =
-            `${metricType}Metric` as keyof typeof this.mustClauses;
+        const metricMethodMap: Record<MetricType, () => MustClause> = {
+            [MetricType.CPU]: () => this.mustClauses.cpuMetric(),
+            [MetricType.MEMORY]: () => this.mustClauses.memoryMetric(),
+            [MetricType.DISK]: () => this.mustClauses.diskMetric(),
+        };
 
         return this.build(`${metricType}-anomaly`, [
             this.mustClauses.rangeTime(timeRange),
-            this.mustClauses[metricMethod](),
+            metricMethodMap[metricType](),
         ]);
     }
 
     /**
      * 최신 메트릭 쿼리 빌드
      */
-    static buildLatestMetrics(hostname: string): SearchQuery {
+    static buildLatestMetrics(ip: string): SearchQuery {
         return this.build('latest-metrics', [
             this.mustClauses.rangeTime('now-5m'),
-            this.mustClauses.host(hostname),
+            this.mustClauses.hostByIp(ip),
+        ]);
+    }
+
+    /**
+     * 전체 서버 목록 쿼리 빌드
+     */
+    static buildAllServers(timeRange: string = 'now-15m'): SearchQuery {
+        return this.build('all-servers', [
+            this.mustClauses.rangeTime(timeRange),
+        ]);
+    }
+
+    /**
+     * 다중 서버 메트릭 쿼리 빌드
+     */
+    static buildMultipleHosts(
+        ips: string[],
+        timeRange: string = 'now-1h',
+    ): SearchQuery {
+        return this.build('all-servers', [
+            this.mustClauses.rangeTime(timeRange),
+            this.mustClauses.terms('host.ip', ips),
         ]);
     }
 }

@@ -40,8 +40,23 @@ export interface ServerInfo {
     serviceType?: string;
 }
 
+export interface ServerOverview {
+    hostname: string;
+    ip: string;
+    os?: string;
+    osVersion?: string;
+    heartbeat: 'alive' | 'dead';
+    lastSeen: string;
+    cpu?: number;
+    memory?: number;
+    disk?: number;
+    load1?: number;
+    load5?: number;
+    load15?: number;
+}
+
 export interface QueryParams {
-    hostname?: string;
+    ip?: string;
     timeRange?: string;
     interval?: string;
     metricType?: string;
@@ -61,5 +76,6 @@ export interface ApiResponse<T = any> {
         page?: number;
         limit?: number;
         took?: number;
+        [key: string]: any;
     };
 }

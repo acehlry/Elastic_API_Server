@@ -1,0 +1,46 @@
+{
+  "size": 0,
+  "query": {
+    "bool": {
+      "must": [],
+      "filter": [
+        {
+          "terms": {
+            "metricset.name": ["cpu", "memory", "filesystem"]
+          }
+        }
+      ]
+    }
+  },
+  "aggs": {
+    "by_metricset": {
+      "terms": {
+        "field": "metricset.name",
+        "include": ["cpu", "memory", "filesystem"]
+      },
+      "aggs": {
+        "latest": {
+          "top_hits": {
+            "size": 1,
+            "sort": [{ "@timestamp": { "order": "desc" } }],
+            "_source": {
+              "includes": [
+                "@timestamp",
+                "host.name",
+                "host.ip",
+                "host.os.name",
+                "host.os.version",
+                "system.cpu.total.norm.pct",
+                "system.memory.used.pct",
+                "system.filesystem.used.pct",
+                "system.load.1",
+                "system.load.5",
+                "system.load.15"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
