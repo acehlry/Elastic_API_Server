@@ -3,7 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
 import routes from './routes';
+import { swaggerSpec } from './config/swagger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import logger from './config/logger';
 import elasticsearchService from './services/ElasticsearchService';
@@ -53,6 +55,12 @@ class Server {
   }
 
   private initializeRoutes(): void {
+    // Swagger UI
+    this.app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+    this.app.get('/api-docs.json', (_req: Request, res: Response) => {
+      res.json(swaggerSpec);
+    });
+
     // API routes
     this.app.use('/api', routes);
 

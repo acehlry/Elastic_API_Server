@@ -11,8 +11,30 @@ import { ApiResponse } from '../types';
 const router = Router();
 
 /**
- * GET /api/servers
- * 전체 서버 목록 + 현재 리소스 (CPU, memory, disk, heartbeat)
+ * @swagger
+ * /servers:
+ *   get:
+ *     summary: 전체 서버 목록 + 현재 리소스 조회
+ *     tags: [Servers]
+ *     parameters:
+ *       - $ref: '#/components/parameters/timeRange'
+ *     responses:
+ *       200:
+ *         description: 서버 목록 (CPU / Memory / Disk / Heartbeat 포함)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ServerOverview'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer, example: 5 }
  */
 router.get(
   '/',
@@ -30,8 +52,78 @@ router.get(
 );
 
 /**
- * GET /api/servers/metrics/latest
- * 감지 중인 전체 서버 최신 메트릭
+ * @swagger
+ * /servers/heartbeat:
+ *   get:
+ *     summary: 전체 서버 Heartbeat 상태 + 현재 리소스
+ *     description: Metricbeat last_seen 기준으로 alive/dead 판정 (5분 기준). CPU, Memory, Disk 포함.
+ *     tags: [Servers]
+ *     parameters:
+ *       - $ref: '#/components/parameters/timeRange'
+ *     responses:
+ *       200:
+ *         description: Heartbeat 상태 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/HeartbeatEntry'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer, example: 5 }
+ *                     alive: { type: integer, example: 4 }
+ *                     dead:  { type: integer, example: 1 }
+ */
+router.get(
+  '/heartbeat',
+  asyncHandler(async (req: Request, res: Response) => {
+    const timeRange = (req.query.timeRange as string) || 'now-15m';
+
+    const data = await metricsService.getHeartbeat(timeRange);
+
+    return res.json({
+      success: true,
+      data,
+      meta: {
+        total: data.length,
+        alive: data.filter(s => s.status === 'alive').length,
+        dead: data.filter(s => s.status === 'dead').length
+      }
+    } as ApiResponse);
+  })
+);
+
+/**
+ * @swagger
+ * /servers/metrics/latest:
+ *   get:
+ *     summary: 전체 서버 최신 메트릭 조회
+ *     tags: [Servers]
+ *     parameters:
+ *       - $ref: '#/components/parameters/timeRange'
+ *     responses:
+ *       200:
+ *         description: 서버별 최신 메트릭 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MetricData'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer, example: 5 }
  */
 router.get(
   '/metrics/latest',
@@ -49,8 +141,36 @@ router.get(
 );
 
 /**
- * GET /api/servers/metrics/timeseries
- * 감지 중인 전체 서버 시계열 (서버별로 묶어서 반환)
+ * @swagger
+ * /servers/metrics/timeseries:
+ *   get:
+ *     summary: 전체 서버 시계열 메트릭 조회
+ *     tags: [Servers]
+ *     parameters:
+ *       - in: query
+ *         name: timeRange
+ *         schema: { type: string, default: now-1h }
+ *         description: 조회 시간 범위 (예: now-1h, now-6h, now-24h)
+ *       - $ref: '#/components/parameters/interval'
+ *     responses:
+ *       200:
+ *         description: 서버별 시계열 데이터
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/ServerTimeSeries'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:     { type: integer, example: 5 }
+ *                     timeRange: { type: string,  example: now-1h }
+ *                     interval:  { type: string,  example: 5m }
  */
 router.get(
   '/metrics/timeseries',
@@ -69,64 +189,50 @@ router.get(
 );
 
 /**
- * GET /api/servers/:ip/metrics/latest
- * 서버의 최신 메트릭 조회
- */
-router.get(
-  '/:ip/metrics/latest',
-  validateServerMetrics,
-  asyncHandler(async (req: Request, res: Response) => {
-    const { ip } = req.params;
-
-    const metrics = await metricsService.getLatestMetrics(ip);
-
-    if (!metrics) {
-      return res.status(404).json({
-        success: false,
-        error: `No metrics found for server: ${ip}`
-      });
-    }
-
-    return res.json({
-      success: true,
-      data: metrics
-    } as ApiResponse);
-  })
-);
-
-/**
- * GET /api/servers/:ip/metrics/timeseries
- * 서버의 시계열 메트릭 조회
- */
-router.get(
-  '/:ip/metrics/timeseries',
-  validateTimeSeries,
-  asyncHandler(async (req: Request, res: Response) => {
-    const { ip } = req.params;
-    const { timeRange, interval } = req.query;
-
-    const timeSeries = await metricsService.getTimeSeriesData(
-      ip,
-      timeRange as string,
-      interval as string
-    );
-
-    return res.json({
-      success: true,
-      data: timeSeries,
-      meta: {
-        total: timeSeries.length,
-        ip,
-        timeRange,
-        interval
-      }
-    } as ApiResponse);
-  })
-);
-
-/**
- * POST /api/servers/metrics/batch
- * 다중 서버 메트릭 조회
+ * @swagger
+ * /servers/metrics/batch:
+ *   post:
+ *     summary: 다중 서버 메트릭 일괄 조회
+ *     tags: [Servers]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [ips]
+ *             properties:
+ *               ips:
+ *                 type: array
+ *                 items: { type: string }
+ *                 example: ['192.168.0.10', '192.168.0.11']
+ *               timeRange:
+ *                 type: string
+ *                 example: now-1h
+ *     responses:
+ *       200:
+ *         description: 요청한 서버들의 최신 메트릭
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MetricData'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:     { type: integer, example: 2 }
+ *                     requested: { type: integer, example: 2 }
+ *       400:
+ *         description: ips 배열 누락
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  */
 router.post(
   '/metrics/batch',
@@ -157,41 +263,37 @@ router.post(
 );
 
 /**
- * GET /api/servers/:ip/logs
- * 서버 로그 페이징 조회
- * query: timeRange, page, limit
- */
-router.get(
-  '/:ip/logs',
-  validateServerMetrics,
-  asyncHandler(async (req: Request, res: Response) => {
-    const { ip } = req.params;
-    const timeRange = (req.query.timeRange as string) || 'now-1h';
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 50;
-    const levels = (req.query.level as string)
-      ?.split(',')
-      .map(l => l.trim())
-      .filter(Boolean);
-
-    const result = await logService.getServerLogs(ip, timeRange, page, limit, levels);
-
-    return res.json({
-      success: true,
-      data: result.logs,
-      meta: {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages
-      }
-    } as ApiResponse);
-  })
-);
-
-/**
- * GET /api/servers/:ip
- * 서버 상세 정보 (최신 메트릭 + 1시간 시계열)
+ * @swagger
+ * /servers/{ip}:
+ *   get:
+ *     summary: 서버 상세 (최신 메트릭 + 1시간 시계열 + OS 정보)
+ *     tags: [Servers]
+ *     parameters:
+ *       - $ref: '#/components/parameters/ipPath'
+ *     responses:
+ *       200:
+ *         description: 서버 상세 정보
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     current:
+ *                       $ref: '#/components/schemas/MetricData'
+ *                     timeSeries:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/TimeSeriesData'
+ *       404:
+ *         description: 서버를 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
  */
 router.get(
   '/:ip',
@@ -216,6 +318,187 @@ router.get(
       data: {
         current: latestMetrics,
         timeSeries: timeSeriesData
+      }
+    } as ApiResponse);
+  })
+);
+
+/**
+ * @swagger
+ * /servers/{ip}/metrics/latest:
+ *   get:
+ *     summary: 특정 서버 최신 메트릭 조회
+ *     tags: [Servers]
+ *     parameters:
+ *       - $ref: '#/components/parameters/ipPath'
+ *     responses:
+ *       200:
+ *         description: 최신 메트릭
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   $ref: '#/components/schemas/MetricData'
+ *       404:
+ *         description: 서버를 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.get(
+  '/:ip/metrics/latest',
+  validateServerMetrics,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { ip } = req.params;
+
+    const metrics = await metricsService.getLatestMetrics(ip);
+
+    if (!metrics) {
+      return res.status(404).json({
+        success: false,
+        error: `No metrics found for server: ${ip}`
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: metrics
+    } as ApiResponse);
+  })
+);
+
+/**
+ * @swagger
+ * /servers/{ip}/metrics/timeseries:
+ *   get:
+ *     summary: 특정 서버 시계열 메트릭 조회
+ *     tags: [Servers]
+ *     parameters:
+ *       - $ref: '#/components/parameters/ipPath'
+ *       - in: query
+ *         name: timeRange
+ *         schema: { type: string, default: now-1h }
+ *         description: 조회 시간 범위
+ *       - $ref: '#/components/parameters/interval'
+ *     responses:
+ *       200:
+ *         description: 시계열 데이터
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/TimeSeriesData'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:     { type: integer, example: 12 }
+ *                     ip:        { type: string,  example: 192.168.0.10 }
+ *                     timeRange: { type: string,  example: now-1h }
+ *                     interval:  { type: string,  example: 5m }
+ */
+router.get(
+  '/:ip/metrics/timeseries',
+  validateTimeSeries,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { ip } = req.params;
+    const { timeRange, interval } = req.query;
+
+    const timeSeries = await metricsService.getTimeSeriesData(
+      ip,
+      timeRange as string,
+      interval as string
+    );
+
+    return res.json({
+      success: true,
+      data: timeSeries,
+      meta: {
+        total: timeSeries.length,
+        ip,
+        timeRange,
+        interval
+      }
+    } as ApiResponse);
+  })
+);
+
+/**
+ * @swagger
+ * /servers/{ip}/logs:
+ *   get:
+ *     summary: 특정 서버 로그 페이징 조회
+ *     tags: [Servers]
+ *     parameters:
+ *       - $ref: '#/components/parameters/ipPath'
+ *       - in: query
+ *         name: timeRange
+ *         schema: { type: string, default: now-1h }
+ *         description: 조회 시간 범위
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: 페이지 번호
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 50 }
+ *         description: 페이지당 로그 수 (최대 200)
+ *       - in: query
+ *         name: level
+ *         schema: { type: string }
+ *         description: 로그 레벨 필터 (콤마 구분, 예&#58; ERROR,WARN)
+ *     responses:
+ *       200:
+ *         description: 로그 목록 (페이징)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/LogEntry'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:      { type: integer, example: 120 }
+ *                     page:       { type: integer, example: 1 }
+ *                     limit:      { type: integer, example: 50 }
+ *                     totalPages: { type: integer, example: 3 }
+ */
+router.get(
+  '/:ip/logs',
+  validateServerMetrics,
+  asyncHandler(async (req: Request, res: Response) => {
+    const { ip } = req.params;
+    const timeRange = (req.query.timeRange as string) || 'now-1h';
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const levels = (req.query.level as string)
+      ?.split(',')
+      .map(l => l.trim())
+      .filter(Boolean);
+
+    const result = await logService.getServerLogs(ip, timeRange, page, limit, levels);
+
+    return res.json({
+      success: true,
+      data: result.logs,
+      meta: {
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages
       }
     } as ApiResponse);
   })

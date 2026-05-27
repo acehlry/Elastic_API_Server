@@ -1,5 +1,6 @@
 import { QueryBuilder } from '../utils/QueryBuilder';
 import elasticsearchService from './ElasticsearchService';
+import { toKST } from '../utils/dateUtils';
 import { LogEntry, LogPage } from '../types';
 import logger from '../config/logger';
 
@@ -35,7 +36,7 @@ class LogService {
       const logs: LogEntry[] = response.hits.hits.map((hit: any) => {
         const s = hit._source;
         return {
-          timestamp: s['@timestamp'] || '',
+          timestamp: toKST(s['@timestamp'] || ''),
           level: s.log_level || s['log.level'] || s.log?.level || '',
           message: s.message || '',
           parsedMessage: s.log_message || undefined,

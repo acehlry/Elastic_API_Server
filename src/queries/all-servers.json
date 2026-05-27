@@ -49,12 +49,10 @@
                 }
               }
             },
-            "network_in_total": {
-              "sum": { "field": "system.network.in.bytes" }
-            },
-            "network_out_total": {
-              "sum": { "field": "system.network.out.bytes" }
-            }
+            "network_in_max":  { "max": { "field": "system.network.in.bytes" } },
+            "network_in_min":  { "min": { "field": "system.network.in.bytes" } },
+            "network_out_max": { "max": { "field": "system.network.out.bytes" } },
+            "network_out_min": { "min": { "field": "system.network.out.bytes" } }
           }
         }
       }

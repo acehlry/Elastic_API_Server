@@ -2,6 +2,8 @@ export interface MetricData {
     timestamp: string;
     hostname: string;
     ip: string;
+    os?: string;
+    osVersion?: string;
     cpu?: number;
     memory?: number;
     disk?: number;
@@ -66,6 +68,30 @@ export interface ServerTimeSeries {
     hostname: string;
     ip: string;
     timeSeries: TimeSeriesData[];
+}
+
+export interface HeartbeatMonitor {
+    monitorId: string;
+    name: string;
+    type: 'http' | 'tcp' | 'icmp';
+    status: 'up' | 'down';
+    url?: string;
+    ip?: string;
+    port?: number;
+    responseTimeMs?: number;
+    httpStatus?: number;
+    checkedAt: string;
+    availabilityPct?: number;
+}
+
+export interface HeartbeatEntry {
+    hostname: string;
+    ip: string;
+    status: 'alive' | 'dead';
+    lastSeen: string;
+    cpu?: number;
+    memory?: number;
+    disk?: number;
 }
 
 export interface ServerOverview {

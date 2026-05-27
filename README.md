@@ -64,6 +64,15 @@ POST /api/servers/metrics/batch
 {
     ips: [...]
 }
+
+[전체 모니터 상태]
+GET /api/heartbeat/monitors
+
+[특정 모니터]
+GET /api/heartbeat/monitors/:monitorId
+
+[서버 IP 기준 모니터 조회]
+GET /api/heartbeat/monitors/by-ip/:ip
 ```
 
 # API - 로그

@@ -189,6 +189,12 @@ export class QueryBuilder {
         return query;
     }
 
+    static buildHeartbeatStatus(timeRange: string = 'now-5m'): SearchQuery {
+        return this.build('heartbeat-status', [
+            this.mustClauses.rangeTime(timeRange),
+        ]);
+    }
+
     static buildMultipleHosts(
         ips: string[],
         timeRange: string = 'now-1h',

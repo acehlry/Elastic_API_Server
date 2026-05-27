@@ -1,0 +1,45 @@
+{
+  "size": 0,
+  "query": {
+    "bool": {
+      "must": [],
+      "filter": []
+    }
+  },
+  "aggs": {
+    "by_monitor": {
+      "terms": {
+        "field": "monitor.id",
+        "size": 200
+      },
+      "aggs": {
+        "latest": {
+          "top_hits": {
+            "size": 1,
+            "sort": [{ "@timestamp": { "order": "desc" } }],
+            "_source": {
+              "includes": [
+                "@timestamp",
+                "monitor.id",
+                "monitor.name",
+                "monitor.type",
+                "monitor.status",
+                "monitor.duration.us",
+                "monitor.ip",
+                "url.full",
+                "url.port",
+                "http.response.status_code"
+              ]
+            }
+          }
+        },
+        "total_checks": {
+          "value_count": { "field": "monitor.status" }
+        },
+        "up_checks": {
+          "filter": { "term": { "monitor.status": "up" } }
+        }
+      }
+    }
+  }
+}

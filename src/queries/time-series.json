@@ -28,8 +28,10 @@
         "avg_disk": { "avg": { "field": "system.filesystem.used.pct" } },
         "max_cpu": { "max": { "field": "system.cpu.total.norm.pct" } },
         "max_memory": { "max": { "field": "system.memory.used.pct" } },
-        "sum_network_in": { "sum": { "field": "system.network.in.bytes" } },
-        "sum_network_out": { "sum": { "field": "system.network.out.bytes" } }
+        "max_network_in":  { "max": { "field": "system.network.in.bytes" } },
+        "min_network_in":  { "min": { "field": "system.network.in.bytes" } },
+        "max_network_out": { "max": { "field": "system.network.out.bytes" } },
+        "min_network_out": { "min": { "field": "system.network.out.bytes" } }
       }
     }
   }

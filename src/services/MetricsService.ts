@@ -1,5 +1,6 @@
 import { QueryBuilder } from '../utils/QueryBuilder';
 import { Validator } from '../utils/Validator';
+import { toKST, epochToKST, timeRangeToSeconds, intervalToSeconds } from '../utils/dateUtils';
 import elasticsearchService from './ElasticsearchService';
 import {
   MetricData,
@@ -7,6 +8,7 @@ import {
   AnomalyData,
   ServerOverview,
   ServerTimeSeries,
+  HeartbeatEntry,
   MetricType,
   AnomalyLevel,
   Thresholds,
@@ -46,7 +48,7 @@ class MetricsService {
       const query = QueryBuilder.buildLatestMetrics(ip);
       const response = await elasticsearchService.search(query);
       const buckets = elasticsearchService.extractBuckets(response, 'by_metricset');
-      return this.parseMetricDataFromBuckets(buckets);
+      return this.parseMetricDataFromBuckets(buckets, 300); // buildLatestMetrics = now-5m
     } catch (error) {
       logger.error(`Failed to get latest metrics for ${ip}:`, error);
       throw error;
@@ -63,13 +65,12 @@ class MetricsService {
       const hostBuckets = elasticsearchService.extractBuckets(response, 'by_host');
       const now = Date.now();
 
+      const tRangeSecs = timeRangeToSeconds(timeRange);
       return hostBuckets.map(hostBucket => {
         const metricsetBuckets: Bucket[] = hostBucket.by_metricset?.buckets || [];
-        const metricData = this.parseMetricDataFromBuckets(metricsetBuckets);
+        const metricData = this.parseMetricDataFromBuckets(metricsetBuckets, tRangeSecs);
         const lastSeenEpoch: number = hostBucket.last_seen?.value || 0;
-        const lastSeen = lastSeenEpoch
-          ? new Date(lastSeenEpoch).toISOString()
-          : '';
+        const lastSeen = epochToKST(lastSeenEpoch);
 
         const anySource = this.getFirstSource(metricsetBuckets);
 
@@ -102,11 +103,12 @@ class MetricsService {
       const query = QueryBuilder.buildAllServers(timeRange);
       const response = await elasticsearchService.search(query);
       const hostBuckets = elasticsearchService.extractBuckets(response, 'by_host');
+      const tRangeSecs = timeRangeToSeconds(timeRange);
 
       return hostBuckets
         .map(hostBucket => {
           const metricsetBuckets: Bucket[] = hostBucket.by_metricset?.buckets || [];
-          return this.parseMetricDataFromBuckets(metricsetBuckets);
+          return this.parseMetricDataFromBuckets(metricsetBuckets, tRangeSecs);
         })
         .filter((data): data is MetricData => data !== null);
     } catch (error) {
@@ -135,7 +137,7 @@ class MetricsService {
         return {
           hostname: hostBucket.key as string,
           ip: this.extractIPv4(hostInfoSource?.host?.ip),
-          timeSeries: this.parseTimeSeriesBuckets(timeBuckets)
+          timeSeries: this.parseTimeSeriesBuckets(timeBuckets, intervalToSeconds(interval))
         };
       });
     } catch (error) {
@@ -157,7 +159,7 @@ class MetricsService {
       const query = QueryBuilder.buildTimeSeries(ip, timeRange, interval);
       const response = await elasticsearchService.search(query);
       const buckets = elasticsearchService.extractBuckets(response, 'time_buckets');
-      return this.parseTimeSeriesBuckets(buckets);
+      return this.parseTimeSeriesBuckets(buckets, intervalToSeconds(interval));
     } catch (error) {
       logger.error(`Failed to get time series data for ${ip}:`, error);
       throw error;
@@ -215,7 +217,7 @@ class MetricsService {
           faultType: '02',
           faultLevel: this.getFaultLevel(level),
           remarks: this.getRemarks(metricType, value),
-          regDt: source['@timestamp'] || '',
+          regDt: toKST(source['@timestamp'] || ''),
           value: r2(value * 100)
         });
       }
@@ -223,6 +225,38 @@ class MetricsService {
       return results;
     } catch (error) {
       logger.error(`Failed to detect ${metricType} anomaly:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 전체 서버 하트비트 + 현재 리소스 조회
+   */
+  async getHeartbeat(timeRange: string = 'now-15m'): Promise<HeartbeatEntry[]> {
+    try {
+      const query = QueryBuilder.buildAllServers(timeRange);
+      const response = await elasticsearchService.search(query);
+      const hostBuckets = elasticsearchService.extractBuckets(response, 'by_host');
+      const now = Date.now();
+
+      const hbRangeSecs = timeRangeToSeconds(timeRange);
+      return hostBuckets.map(hostBucket => {
+        const metricsetBuckets: Bucket[] = hostBucket.by_metricset?.buckets || [];
+        const metricData = this.parseMetricDataFromBuckets(metricsetBuckets, hbRangeSecs);
+        const lastSeenEpoch: number = hostBucket.last_seen?.value || 0;
+
+        return {
+          hostname: hostBucket.key as string,
+          ip: metricData?.ip || '',
+          status: (now - lastSeenEpoch) < HEARTBEAT_THRESHOLD_MS ? 'alive' : 'dead',
+          lastSeen: epochToKST(lastSeenEpoch),
+          cpu: metricData?.cpu,
+          memory: metricData?.memory,
+          disk: metricData?.disk
+        };
+      });
+    } catch (error) {
+      logger.error('Failed to get heartbeat:', error);
       throw error;
     }
   }
@@ -239,9 +273,10 @@ class MetricsService {
       const response = await elasticsearchService.search(query);
       const hostBuckets = elasticsearchService.extractBuckets(response, 'by_host');
 
+      const batchRangeSecs = timeRangeToSeconds(timeRange);
       return hostBuckets.map(hostBucket => {
         const metricsetBuckets: Bucket[] = hostBucket.by_metricset?.buckets || [];
-        return this.parseMetricDataFromBuckets(metricsetBuckets);
+        return this.parseMetricDataFromBuckets(metricsetBuckets, batchRangeSecs);
       }).filter((data): data is MetricData => data !== null);
     } catch (error) {
       logger.error('Failed to get multiple server metrics:', error);
@@ -251,9 +286,9 @@ class MetricsService {
 
   /**
    * by_metricset 버킷에서 MetricData 파싱
-   * CPU, memory, filesystem 각 메트릭셋 문서에서 값을 합산
+   * networkIn/networkOut은 (max - min) / secs / 1024 로 KB/s 계산
    */
-  private parseMetricDataFromBuckets(buckets: Bucket[]): MetricData | null {
+  private parseMetricDataFromBuckets(buckets: Bucket[], timeRangeSecs: number = 300): MetricData | null {
     const cpuBucket = buckets.find(b => b.key === 'cpu');
     const memoryBucket = buckets.find(b => b.key === 'memory');
     const diskBucket = buckets.find(b => b.key === 'filesystem');
@@ -266,13 +301,17 @@ class MetricsService {
     const baseSource = cpuSource || memorySource || diskSource;
     if (!baseSource) return null;
 
-    const networkIn = networkBucket?.network_in_total?.value;
-    const networkOut = networkBucket?.network_out_total?.value;
+    const inMax  = networkBucket?.network_in_max?.value;
+    const inMin  = networkBucket?.network_in_min?.value;
+    const outMax = networkBucket?.network_out_max?.value;
+    const outMin = networkBucket?.network_out_min?.value;
 
     return {
-      timestamp: baseSource['@timestamp'] || '',
+      timestamp: toKST(baseSource['@timestamp'] || ''),
       hostname: baseSource.host?.name || '',
       ip: this.extractIPv4(baseSource.host?.ip),
+      os: baseSource.host?.os?.name,
+      osVersion: baseSource.host?.os?.version,
       cpu: cpuSource?.system?.cpu?.total?.norm?.pct != null
         ? r2(cpuSource.system.cpu.total.norm.pct * 100)
         : undefined,
@@ -285,8 +324,8 @@ class MetricsService {
       load1: cpuSource?.system?.load?.['1'],
       load5: cpuSource?.system?.load?.['5'],
       load15: cpuSource?.system?.load?.['15'],
-      networkIn: networkIn != null ? r2(networkIn) : undefined,
-      networkOut: networkOut != null ? r2(networkOut) : undefined
+      networkIn:  inMax  != null && inMin  != null ? r2(Math.max(0, inMax  - inMin)  / timeRangeSecs / 1024) : undefined,
+      networkOut: outMax != null && outMin != null ? r2(Math.max(0, outMax - outMin) / timeRangeSecs / 1024) : undefined,
     };
   }
 
@@ -303,17 +342,18 @@ class MetricsService {
 
   /**
    * 시계열 버킷 파싱
+   * networkIn/networkOut은 (max - min) / intervalSecs / 1024 로 KB/s 계산
    */
-  private parseTimeSeriesBuckets(buckets: Bucket[]): TimeSeriesData[] {
+  private parseTimeSeriesBuckets(buckets: Bucket[], intervalSecs: number = 300): TimeSeriesData[] {
     return buckets.map(bucket => ({
-      timestamp: bucket.key_as_string || String(bucket.key),
+      timestamp: toKST(bucket.key_as_string || String(bucket.key)),
       cpu: r2((bucket.avg_cpu?.value || 0) * 100),
       memory: r2((bucket.avg_memory?.value || 0) * 100),
       disk: r2((bucket.avg_disk?.value || 0) * 100),
       maxCpu: r2((bucket.max_cpu?.value || 0) * 100),
       maxMemory: r2((bucket.max_memory?.value || 0) * 100),
-      networkIn: r2(bucket.sum_network_in?.value || 0),
-      networkOut: r2(bucket.sum_network_out?.value || 0)
+      networkIn:  r2(Math.max(0, (bucket.max_network_in?.value  ?? 0) - (bucket.min_network_in?.value  ?? 0)) / intervalSecs / 1024),
+      networkOut: r2(Math.max(0, (bucket.max_network_out?.value ?? 0) - (bucket.min_network_out?.value ?? 0)) / intervalSecs / 1024),
     }));
   }
 
@@ -358,7 +398,14 @@ class MetricsService {
   private extractIPv4(ips: string | string[] | undefined): string {
     if (!ips) return '';
     const ipArray = Array.isArray(ips) ? ips : [ips];
-    return ipArray.find(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip)) || ipArray[0] || '';
+    const v4 = ipArray.filter(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    // 169.254.x.x(APIPA 링크-로컬)와 127.x.x.x(루프백)를 제외하고 우선 선택
+    return (
+      v4.find(ip => !/^(169\.254\.|127\.)/.test(ip)) ??
+      v4[0] ??
+      ipArray[0] ??
+      ''
+    );
   }
 }
 
