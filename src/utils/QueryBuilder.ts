@@ -195,6 +195,20 @@ export class QueryBuilder {
         ]);
     }
 
+    static buildHeartbeatTimeSeries(
+        timeRange: string = 'now-1h',
+        interval: string = '5m',
+        monitorId?: string,
+    ): SearchQuery {
+        const clauses = [this.mustClauses.rangeTime(timeRange)];
+        if (monitorId) clauses.push(this.mustClauses.term('monitor.id', monitorId));
+        return this.build(
+            'heartbeat-timeseries',
+            clauses,
+            { interval, start_time: timeRange, end_time: 'now' },
+        );
+    }
+
     static buildMultipleHosts(
         ips: string[],
         timeRange: string = 'now-1h',

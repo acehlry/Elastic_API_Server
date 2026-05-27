@@ -73,6 +73,12 @@ GET /api/heartbeat/monitors/:monitorId
 
 [서버 IP 기준 모니터 조회]
 GET /api/heartbeat/monitors/by-ip/:ip
+
+[전체 모니터 시계열]
+GET /api/heartbeat/monitors/timeseries
+
+[특정 모니터 시계열]
+GET /api/heartbeat/monitors/:monitorId/timeseries
 ```
 
 # API - 로그

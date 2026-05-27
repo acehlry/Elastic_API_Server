@@ -105,6 +105,30 @@ const options: swaggerJsdoc.Options = {
             disk:     { type: 'number', example: 32.1, nullable: true },
           },
         },
+        HeartbeatTimePoint: {
+          type: 'object',
+          properties: {
+            timestamp:     { type: 'string', example: '2026-05-27T18:00:00.000+09:00' },
+            status:        { type: 'string', enum: ['up', 'down', 'mixed'], example: 'up' },
+            upCount:       { type: 'integer', example: 6 },
+            downCount:     { type: 'integer', example: 0 },
+            avgResponseMs: { type: 'integer', example: 12, nullable: true },
+          },
+        },
+        HeartbeatTimeSeries: {
+          type: 'object',
+          properties: {
+            monitorId:  { type: 'string', example: 'was-192-168-0-10' },
+            name:       { type: 'string', example: 'WAS 192.168.0.10' },
+            type:       { type: 'string', enum: ['http', 'tcp', 'icmp'], example: 'http' },
+            url:        { type: 'string', example: 'http://192.168.0.10:8080/health', nullable: true },
+            ip:         { type: 'string', example: '192.168.0.10', nullable: true },
+            timeSeries: {
+              type: 'array',
+              items: { '$ref': '#/components/schemas/HeartbeatTimePoint' },
+            },
+          },
+        },
         HeartbeatMonitor: {
           type: 'object',
           properties: {

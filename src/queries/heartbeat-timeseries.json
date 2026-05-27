@@ -1,0 +1,48 @@
+{
+  "size": 0,
+  "query": {
+    "bool": {
+      "must": [],
+      "filter": []
+    }
+  },
+  "aggs": {
+    "by_monitor": {
+      "terms": {
+        "field": "monitor.id",
+        "size": 200
+      },
+      "aggs": {
+        "monitor_info": {
+          "top_hits": {
+            "size": 1,
+            "sort": [{ "@timestamp": { "order": "desc" } }],
+            "_source": {
+              "includes": [
+                "monitor.name",
+                "monitor.type",
+                "monitor.ip",
+                "url.full"
+              ]
+            }
+          }
+        },
+        "time_buckets": {
+          "date_histogram": {
+            "field": "@timestamp",
+            "fixed_interval": "{{interval}}",
+            "extended_bounds": {
+              "min": "{{start_time}}",
+              "max": "{{end_time}}"
+            }
+          },
+          "aggs": {
+            "up_count":   { "filter": { "term": { "monitor.status": "up" } } },
+            "down_count": { "filter": { "term": { "monitor.status": "down" } } },
+            "avg_response_us": { "avg": { "field": "monitor.duration.us" } }
+          }
+        }
+      }
+    }
+  }
+}

@@ -70,6 +70,23 @@ export interface ServerTimeSeries {
     timeSeries: TimeSeriesData[];
 }
 
+export interface HeartbeatTimePoint {
+    timestamp: string;
+    status: 'up' | 'down' | 'mixed';
+    upCount: number;
+    downCount: number;
+    avgResponseMs?: number;
+}
+
+export interface HeartbeatTimeSeries {
+    monitorId: string;
+    name: string;
+    type: 'http' | 'tcp' | 'icmp';
+    url?: string;
+    ip?: string;
+    timeSeries: HeartbeatTimePoint[];
+}
+
 export interface HeartbeatMonitor {
     monitorId: string;
     name: string;

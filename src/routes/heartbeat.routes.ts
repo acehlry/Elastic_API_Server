@@ -59,6 +59,128 @@ router.get(
 
 /**
  * @swagger
+ * /heartbeat/monitors/timeseries:
+ *   get:
+ *     summary: 전체 모니터 시간대별 up/down 조회
+ *     description: |
+ *       모니터별로 지정한 시간 범위를 interval 단위 버킷으로 나눠 up/down 횟수와
+ *       평균 응답시간을 반환합니다. status는 up / down / mixed 중 하나입니다.
+ *     tags: [Heartbeat]
+ *     parameters:
+ *       - in: query
+ *         name: timeRange
+ *         schema: { type: string, default: now-1h }
+ *         description: 조회 시간 범위 (예&#58; now-1h, now-6h, now-24h)
+ *       - in: query
+ *         name: interval
+ *         schema: { type: string, default: 5m }
+ *         description: 버킷 간격 (예&#58; 1m, 5m, 30m, 1h)
+ *     responses:
+ *       200:
+ *         description: 모니터별 시계열 데이터
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/HeartbeatTimeSeries'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:     { type: integer, example: 3 }
+ *                     timeRange: { type: string,  example: now-1h }
+ *                     interval:  { type: string,  example: 5m }
+ */
+router.get(
+  '/monitors/timeseries',
+  asyncHandler(async (req: Request, res: Response) => {
+    const timeRange = (req.query.timeRange as string) || 'now-1h';
+    const interval  = (req.query.interval  as string) || '5m';
+
+    const data = await heartbeatService.getMonitorTimeSeries(timeRange, interval);
+
+    return res.json({
+      success: true,
+      data,
+      meta: { total: data.length, timeRange, interval }
+    } as ApiResponse);
+  })
+);
+
+/**
+ * @swagger
+ * /heartbeat/monitors/{monitorId}/timeseries:
+ *   get:
+ *     summary: 특정 모니터 시간대별 up/down 조회
+ *     tags: [Heartbeat]
+ *     parameters:
+ *       - in: path
+ *         name: monitorId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Heartbeat monitor.id
+ *         example: was-192-168-0-10
+ *       - in: query
+ *         name: timeRange
+ *         schema: { type: string, default: now-1h }
+ *         description: 조회 시간 범위
+ *       - in: query
+ *         name: interval
+ *         schema: { type: string, default: 5m }
+ *         description: 버킷 간격
+ *     responses:
+ *       200:
+ *         description: 해당 모니터의 시계열 데이터
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   $ref: '#/components/schemas/HeartbeatTimeSeries'
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     timeRange: { type: string, example: now-1h }
+ *                     interval:  { type: string, example: 5m }
+ *       404:
+ *         description: 모니터를 찾을 수 없음
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiError'
+ */
+router.get(
+  '/monitors/:monitorId/timeseries',
+  asyncHandler(async (req: Request, res: Response) => {
+    const { monitorId } = req.params;
+    const timeRange = (req.query.timeRange as string) || 'now-1h';
+    const interval  = (req.query.interval  as string) || '5m';
+
+    const data = await heartbeatService.getMonitorTimeSeriesById(monitorId, timeRange, interval);
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        error: `Monitor not found: ${monitorId}`
+      });
+    }
+
+    return res.json({
+      success: true,
+      data,
+      meta: { timeRange, interval }
+    } as ApiResponse);
+  })
+);
+
+/**
+ * @swagger
  * /heartbeat/monitors/by-ip/{ip}:
  *   get:
  *     summary: 서버 IP 기준 모니터 조회

@@ -1,7 +1,7 @@
 import { QueryBuilder } from '../utils/QueryBuilder';
 import elasticsearchService from './ElasticsearchService';
 import { toKST } from '../utils/dateUtils';
-import { HeartbeatMonitor } from '../types';
+import { HeartbeatMonitor, HeartbeatTimeSeries, HeartbeatTimePoint } from '../types';
 import logger from '../config/logger';
 
 class HeartbeatService {
@@ -68,6 +68,77 @@ class HeartbeatService {
   async getMonitorsByIp(ip: string, timeRange: string = 'now-5m'): Promise<HeartbeatMonitor[]> {
     const monitors = await this.getMonitorStatus(timeRange);
     return monitors.filter(m => m.ip === ip);
+  }
+
+  /**
+   * 전체 모니터 시계열 조회
+   */
+  async getMonitorTimeSeries(
+    timeRange: string = 'now-1h',
+    interval: string = '5m'
+  ): Promise<HeartbeatTimeSeries[]> {
+    try {
+      const query = QueryBuilder.buildHeartbeatTimeSeries(timeRange, interval);
+      const response = await elasticsearchService.search(query, this.index);
+      const monitorBuckets = elasticsearchService.extractBuckets(response, 'by_monitor');
+      return monitorBuckets.map(b => this.parseMonitorTimeSeries(b));
+    } catch (error) {
+      logger.error('Failed to get heartbeat monitor time series:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 특정 모니터 시계열 조회
+   */
+  async getMonitorTimeSeriesById(
+    monitorId: string,
+    timeRange: string = 'now-1h',
+    interval: string = '5m'
+  ): Promise<HeartbeatTimeSeries | null> {
+    try {
+      const query = QueryBuilder.buildHeartbeatTimeSeries(timeRange, interval, monitorId);
+      const response = await elasticsearchService.search(query, this.index);
+      const monitorBuckets = elasticsearchService.extractBuckets(response, 'by_monitor');
+      if (monitorBuckets.length === 0) return null;
+      return this.parseMonitorTimeSeries(monitorBuckets[0]);
+    } catch (error) {
+      logger.error(`Failed to get heartbeat time series for ${monitorId}:`, error);
+      throw error;
+    }
+  }
+
+  private parseMonitorTimeSeries(bucket: any): HeartbeatTimeSeries {
+    const infoSource = bucket.monitor_info?.hits?.hits?.[0]?._source;
+    const timeBuckets: any[] = bucket.time_buckets?.buckets || [];
+
+    const timeSeries: HeartbeatTimePoint[] = timeBuckets.map(tb => {
+      const upCount: number   = tb.up_count?.doc_count   ?? 0;
+      const downCount: number = tb.down_count?.doc_count  ?? 0;
+      const avgUs: number | null = tb.avg_response_us?.value ?? null;
+
+      let status: 'up' | 'down' | 'mixed';
+      if (upCount > 0 && downCount === 0)      status = 'up';
+      else if (downCount > 0 && upCount === 0) status = 'down';
+      else                                     status = 'mixed';
+
+      return {
+        timestamp:      toKST(tb.key_as_string || String(tb.key)),
+        status,
+        upCount,
+        downCount,
+        avgResponseMs:  avgUs != null ? Math.round(avgUs / 1000) : undefined,
+      };
+    });
+
+    return {
+      monitorId: bucket.key as string,
+      name:      infoSource?.monitor?.name  || (bucket.key as string),
+      type:      infoSource?.monitor?.type  || 'http',
+      url:       infoSource?.url?.full,
+      ip:        infoSource?.monitor?.ip,
+      timeSeries,
+    };
   }
 }
 
