@@ -79,6 +79,16 @@ GET /api/heartbeat/monitors/timeseries
 
 [특정 모니터 시계열]
 GET /api/heartbeat/monitors/:monitorId/timeseries
+
+
+up : 해당 구간 내 체크가 전부 성공 (모두 HTTP 200)
+down : 해당 구간 내 체크가 전부 실패 (타임아웃 또는 응답 오류)
+mixed : 해당 구간 내 성공도 있고 실패도 있음 → 간헐적 장애
+예시 (interval=5m, 30초마다 체크 → 버킷당 10번 체크):
+
+18:00~18:05  upCount=10, downCount=0  → "up"    (정상)
+18:05~18:10  upCount=0,  downCount=10 → "down"   (완전 중단)
+18:10~18:15  upCount=6,  downCount=4  → "mixed"  (불안정, 간헐적 오류)
 ```
 
 # API - 로그
