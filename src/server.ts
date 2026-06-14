@@ -10,6 +10,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import logger from './config/logger';
 import elasticsearchService from './services/ElasticsearchService';
 import alertMonitor from './services/AlertMonitorService';
+import notificationService from './services/NotificationService';
 
 // 환경 변수 로드
 dotenv.config();
@@ -103,7 +104,7 @@ class Server {
         logger.info(`📡 API: http://localhost:${this.port}/api`);
       });
 
-      alertMonitor.start();
+      await alertMonitor.start();
     } catch (error) {
       logger.error('Failed to start server:', error);
       process.exit(1);
@@ -120,16 +121,13 @@ const server = new Server();
 server.start();
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
+const shutdown = async () => {
   alertMonitor.stop();
+  await notificationService.close();
   process.exit(0);
-});
+};
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  alertMonitor.stop();
-  process.exit(0);
-});
+process.on('SIGTERM', () => { logger.info('SIGTERM received, shutting down gracefully'); shutdown(); });
+process.on('SIGINT',  () => { logger.info('SIGINT received, shutting down gracefully');  shutdown(); });
 
 export default server;

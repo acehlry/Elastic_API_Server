@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import elasticsearchService from './ElasticsearchService';
-import smsService from './SmsService';
+import notificationService from './NotificationService';
+import cmsRepository from '../repositories/CMSRepository';
 import logger from '../config/logger';
 import { toKST } from '../utils/dateUtils';
 
@@ -16,12 +17,13 @@ const DEFAULT_INDICES = [
 const ALERT_LEVELS = ['ERROR', 'ERR'];
 
 interface ErrorLog {
-  timestamp:      string;
-  hostname:       string;
-  service:        string;
-  level:          string;
-  message:        string;
-  parsedMessage?: string;
+  timestamp:       string;
+  hostname:        string;
+  ip?:             string;
+  service:         string;
+  level:           string;
+  message:         string;
+  parsedMessage?:  string;
   matchedKeyword?: string;
 }
 
@@ -48,7 +50,6 @@ export interface AlertStatus {
   indices:        string[];
   alertLevels:    string[];
   keywords:       string[];
-  smsConfigured:  boolean;
 }
 
 class AlertMonitorService {
@@ -69,13 +70,13 @@ class AlertMonitorService {
   private isRunning = false;
 
   private readonly pollIntervalMs: number;
-  private readonly cooldownMs:     number;
-  private readonly indices:        string[];
-  private readonly keywords:       string[];
+  private cooldownMs: number;
+  private readonly indices: string[];
+  private readonly keywords: string[];
 
   constructor() {
-    this.pollIntervalMs = parseInt(process.env.ALERT_POLL_MS     || '30000');
-    this.cooldownMs     = parseInt(process.env.ALERT_COOLDOWN_MS || '3600000');
+    this.pollIntervalMs = parseInt(process.env.ALERT_POLL_MS || '30000');
+    this.cooldownMs     = 3600000;  // DB 로드 전 기본값 (1시간)
     this.indices = process.env.ALERT_INDICES
       ? process.env.ALERT_INDICES.split(',').map(s => s.trim())
       : DEFAULT_INDICES;
@@ -83,8 +84,12 @@ class AlertMonitorService {
       .split(',').map(k => k.trim()).filter(Boolean);
   }
 
-  start(): void {
+  async start(): Promise<void> {
     if (this.isRunning) return;
+
+    // DB에서 쿨다운 설정 로드
+    this.cooldownMs = await cmsRepository.getCooldownMs();
+
     this.isRunning = true;
     this.schedule();
     logger.info(`[AlertMonitor] 시작 (폴링: ${this.pollIntervalMs}ms, 쿨다운: ${this.cooldownMs}ms)`);
@@ -113,7 +118,6 @@ class AlertMonitorService {
       indices:        this.indices,
       alertLevels:    ALERT_LEVELS,
       keywords:       this.keywords,
-      smsConfigured:  smsService.isConfigured,
     };
   }
 
@@ -169,8 +173,10 @@ class AlertMonitorService {
 
   private async fetchErrors(since: Date): Promise<ErrorLog[]> {
     // should: 레벨 조건 OR 키워드 조건 중 하나라도 일치하면 감지
+    // log_level.keyword (text+keyword 매핑) 와 log_level (keyword 직접 매핑) 둘 다 시도
     const shouldClauses: any[] = [
       { terms: { 'log_level.keyword': ALERT_LEVELS } },
+      { terms: { 'log_level':         ALERT_LEVELS } },
       ...this.keywords.map(kw => ({
         multi_match: {
           query:  kw,
@@ -193,7 +199,7 @@ class AlertMonitorService {
       },
       sort: [{ '@timestamp': { order: 'asc' as const } }],
       _source: {
-        includes: ['@timestamp', 'message', 'log_message', 'log_level', 'service_name', 'host.name'],
+        includes: ['@timestamp', 'message', 'log_message', 'log_level', 'service_name', 'host.name', 'host.ip'],
       },
     };
 
@@ -203,12 +209,13 @@ class AlertMonitorService {
       const s = hit._source;
       const body = s.log_message || s.message || '';
       return {
-        timestamp:      s['@timestamp'] || '',
-        hostname:       s.host?.name    || 'unknown',
-        service:        s.service_name  || '',
-        level:          s.log_level     || '',
-        message:        s.message       || '',
-        parsedMessage:  s.log_message   || undefined,
+        timestamp:      s['@timestamp']        || '',
+        hostname:       s.host?.name           || 'unknown',
+        ip:             this.extractIPv4(s.host?.ip),
+        service:        s.service_name         || '',
+        level:          (s.log_level || '').trim(),
+        message:        s.message              || '',
+        parsedMessage:  s.log_message          || undefined,
         matchedKeyword: this.findMatchedKeyword(body),
       };
     });
@@ -244,8 +251,8 @@ class AlertMonitorService {
     });
 
     const message = this.buildSmsText(err, suppressedCount, triggerType);
-    logger.info(`[AlertMonitor] SMS 발송 [${triggerType}]: ${err.hostname}/${err.service}`);
-    await smsService.send(message);
+    logger.info(`[AlertMonitor] 알람 발송 [${triggerType}]: ${err.hostname}/${err.service}`);
+    await notificationService.notify(message);
   }
 
   private buildSmsText(
@@ -257,11 +264,20 @@ class AlertMonitorService {
       ? `[키워드: ${err.matchedKeyword}]`
       : `[${err.level}]`;
 
-    const body      = err.parsedMessage || err.message;
-    const truncated = body.length > 100 ? body.slice(0, 100) + '...' : body;
+    const hostLine   = err.ip ? `${err.hostname} (${err.ip})` : err.hostname;
+    const body       = err.parsedMessage || err.message;
+    const truncated  = body.length > 100 ? body.slice(0, 100) + '...' : body;
     const suppressed = suppressedCount > 0 ? `\n(이전 ${suppressedCount}건 억제됨)` : '';
 
-    return `${tag} ${err.hostname} / ${err.service}\n${truncated}${suppressed}`;
+    return `${tag}\n서비스: ${err.service}\n호스트: ${hostLine}\n내용: ${truncated}${suppressed}`;
+  }
+
+  /** host.ip 배열 또는 문자열에서 IPv4 주소 반환 */
+  private extractIPv4(raw: string | string[] | undefined): string | undefined {
+    if (!raw) return undefined;
+    const list = Array.isArray(raw) ? raw : [raw];
+    const ipv4  = list.find(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
+    return ipv4;
   }
 
   /** 메시지에서 설정된 키워드 중 첫 번째 일치 항목 반환 */
