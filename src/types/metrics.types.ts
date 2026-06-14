@@ -51,7 +51,11 @@ export interface LogEntry {
     level: string;
     message: string;
     parsedMessage?: string;
+    logTime?: string;
     service?: string;
+    module?: string;
+    instance?: string;
+    jobId?: string;
     hostname?: string;
     ip?: string;
 }

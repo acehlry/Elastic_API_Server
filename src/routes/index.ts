@@ -3,6 +3,7 @@ import metricsRoutes from './metrics.routes';
 import serversRoutes from './servers.routes';
 import heartbeatRoutes from './heartbeat.routes';
 import logsRoutes from './logs.routes';
+import alertRoutes from './alert.routes';
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use('/metrics', metricsRoutes);
 router.use('/servers', serversRoutes);
 router.use('/heartbeat', heartbeatRoutes);
 router.use('/logs', logsRoutes);
+router.use('/alerts', alertRoutes);
 
 export default router;

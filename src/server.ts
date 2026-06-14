@@ -9,6 +9,7 @@ import { swaggerSpec } from './config/swagger';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import logger from './config/logger';
 import elasticsearchService from './services/ElasticsearchService';
+import alertMonitor from './services/AlertMonitorService';
 
 // 환경 변수 로드
 dotenv.config();
@@ -101,6 +102,8 @@ class Server {
         logger.info(`🔍 Elasticsearch: ${process.env.ES_NODE}`);
         logger.info(`📡 API: http://localhost:${this.port}/api`);
       });
+
+      alertMonitor.start();
     } catch (error) {
       logger.error('Failed to start server:', error);
       process.exit(1);
@@ -119,11 +122,13 @@ server.start();
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
+  alertMonitor.stop();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully');
+  alertMonitor.stop();
   process.exit(0);
 });
 

@@ -218,4 +218,34 @@ export class QueryBuilder {
             this.mustClauses.terms('host.ip', ips),
         ]);
     }
+
+    /**
+     * 서비스명 기반 로그 쿼리 빌드
+     */
+    static buildServiceLogs(
+        serviceName: string,
+        timeRange: string,
+        page: number,
+        limit: number,
+        levels?: string[],
+        keyword?: string,
+    ): SearchQuery {
+        const mustClauses: MustClause[] = [
+            this.mustClauses.rangeTime(timeRange),
+            this.mustClauses.term('service_name', serviceName),
+        ];
+
+        if (levels && levels.length > 0) {
+            mustClauses.push(this.mustClauses.terms('log_level.keyword', levels));
+        }
+
+        if (keyword) {
+            mustClauses.push(this.mustClauses.match('log_message', keyword));
+        }
+
+        const query = this.build('service-logs', mustClauses);
+        query.size = limit;
+        query.from = (page - 1) * limit;
+        return query;
+    }
 }
