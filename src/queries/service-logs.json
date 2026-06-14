@@ -1,0 +1,28 @@
+{
+  "size": 50,
+  "from": 0,
+  "query": {
+    "bool": {
+      "must": []
+    }
+  },
+  "sort": [
+    { "@timestamp": { "order": "desc" } }
+  ],
+  "_source": {
+    "includes": [
+      "@timestamp",
+      "message",
+      "log_level",
+      "log.level",
+      "log_message",
+      "log_time",
+      "service_name",
+      "log_module",
+      "log_instance",
+      "log_job_id",
+      "host.name",
+      "host.ip"
+    ]
+  }
+}

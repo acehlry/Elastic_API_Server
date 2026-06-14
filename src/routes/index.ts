@@ -2,6 +2,7 @@ import { Router } from 'express';
 import metricsRoutes from './metrics.routes';
 import serversRoutes from './servers.routes';
 import heartbeatRoutes from './heartbeat.routes';
+import logsRoutes from './logs.routes';
 
 const router = Router();
 
@@ -35,5 +36,6 @@ router.get('/health', (_req, res) => {
 router.use('/metrics', metricsRoutes);
 router.use('/servers', serversRoutes);
 router.use('/heartbeat', heartbeatRoutes);
+router.use('/logs', logsRoutes);
 
 export default router;
