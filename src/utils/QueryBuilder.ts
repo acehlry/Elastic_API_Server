@@ -231,12 +231,31 @@ export class QueryBuilder {
         }
 
         if (keyword) {
-            mustClauses.push(this.mustClauses.match('log_message', keyword));
+            mustClauses.push({
+                multi_match: {
+                    query:  keyword,
+                    fields: ['log_message', 'message'],
+                    type:   'phrase',
+                },
+            } as unknown as MustClause);
         }
 
         const query = this.build('service-logs', mustClauses);
         query.size = limit;
         query.from = (page - 1) * limit;
+
+        if (keyword) {
+            query.highlight = {
+                pre_tags:            ['<mark>'],
+                post_tags:           ['</mark>'],
+                number_of_fragments: 0,
+                fields: {
+                    log_message: {},
+                    message:     {},
+                },
+            };
+        }
+
         return query;
     }
 }

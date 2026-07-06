@@ -75,7 +75,7 @@ class LogService {
                     : response.hits.total.value;
 
             const logs: LogEntry[] = response.hits.hits.map((hit: any) =>
-                this.parseLogEntry(hit._source),
+                this.parseLogEntry(hit._source, hit.highlight),
             );
 
             return {
@@ -97,19 +97,20 @@ class LogService {
      * @param s 
      * @returns 
      */
-    private parseLogEntry(s: any): LogEntry {
+    private parseLogEntry(s: any, highlight?: Record<string, string[]>): LogEntry {
+        const hl = highlight?.log_message?.[0] ?? highlight?.message?.[0];
         return {
-            timestamp: toKST(s['@timestamp'] || ''),
-            level: s.log_level || s['log.level'] || s.log?.level || '',
-            message: s.message || '',
-            logTime: s.log_time || undefined,
-            service: s.service_name || undefined,
-            module: s.log_module || undefined,
-            instance: s.log_instance || undefined,
-            jobId: s.log_job_id || undefined,
-            hostname: s.host?.name || undefined,
-            ip: this.extractIPv4(s.host?.ip),
-            logFilePath: s.log?.file?.path || undefined,
+            timestamp:     toKST(s['@timestamp'] || ''),
+            level:         s.log_level || s['log.level'] || s.log?.level || '',
+            message:       hl ?? s.message ?? '',
+            logTime:       s.log_time || undefined,
+            service:       s.service_name || undefined,
+            module:        s.log_module || undefined,
+            instance:      s.log_instance || undefined,
+            jobId:         s.log_job_id || undefined,
+            hostname:      s.host?.name || undefined,
+            ip:            this.extractIPv4(s.host?.ip),
+            logFilePath:   s.log?.file?.path || undefined,
         };
     }
 

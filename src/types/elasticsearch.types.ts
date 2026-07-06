@@ -14,6 +14,13 @@ export interface SearchQuery {
         includes?: string[];
         excludes?: string[];
     };
+    highlight?: {
+        pre_tags?: string[];
+        post_tags?: string[];
+        fields: Record<string, Record<string, any>>;
+        number_of_fragments?: number;
+        fragment_size?: number;
+    };
 }
 
 export interface SearchResponse<T = any> {
