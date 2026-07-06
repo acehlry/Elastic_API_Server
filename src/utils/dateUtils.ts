@@ -12,12 +12,28 @@ const TIME_UNIT_SECS: Record<string, number> = {
  * 입력: "2026-05-27T09:42:46.644Z" → 출력: "2026-05-27T18:42:46.644+09:00"
  */
 export const toKST = (utcStr: string): string => {
-    if (!utcStr) return '';
-    const d = new Date(utcStr);
-    if (isNaN(d.getTime())) return utcStr;
-    return new Date(d.getTime() + KST_OFFSET_MS)
-        .toISOString()
-        .replace('Z', '+09:00');
+    // if (!utcStr) return '';
+    // const d = new Date(utcStr);
+    // if (isNaN(d.getTime())) return utcStr;
+    // return new Date(d.getTime() + KST_OFFSET_MS)
+    //     .toISOString()
+    //     .replace('Z', '+09:00');
+    const d = utcStr ? new Date(utcStr) : new Date();
+    if (isNaN(d.getTime())) return '';
+
+    const kst = new Date(d.getTime() + KST_OFFSET_MS);
+
+    const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+
+    const YYYY = kst.getUTCFullYear();
+    const MM = pad(kst.getUTCMonth() + 1);
+    const DD = pad(kst.getUTCDate());
+    const HH = pad(kst.getUTCHours());
+    const mm = pad(kst.getUTCMinutes());
+    const SS = pad(kst.getUTCSeconds());
+    const sss = pad(kst.getUTCMilliseconds(), 3);
+
+    return `${YYYY}${MM}${DD}${HH}${mm}${SS}${sss}`;
 };
 
 /**
