@@ -18,7 +18,8 @@
       "log_message",
       "service_name",
       "host.name",
-      "host.ip"
+      "host.ip",
+      "log.file.path"
     ]
   }
 }

@@ -15,12 +15,11 @@ class ElasticsearchService {
     /**
      * 기본 검색
      */
-    async search<T = any>(
-        query: SearchQuery,
-        index?: string,
-    ): Promise<SearchResponse<T>> {
+    async search<T = any>( query: SearchQuery, index?: string ): Promise<SearchResponse<T>> {
         try {
             const startTime = Date.now();
+
+            console.log('query:::', query)
 
             const response = await this.client.search({
                 index: index || this.indexPattern,

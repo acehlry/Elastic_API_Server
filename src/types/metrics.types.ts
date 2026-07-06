@@ -50,7 +50,6 @@ export interface LogEntry {
     timestamp: string;
     level: string;
     message: string;
-    parsedMessage?: string;
     logTime?: string;
     service?: string;
     module?: string;
@@ -58,6 +57,7 @@ export interface LogEntry {
     jobId?: string;
     hostname?: string;
     ip?: string;
+    logFilePath?: string;
 }
 
 export interface LogPage {

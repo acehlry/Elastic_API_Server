@@ -93,7 +93,10 @@ class CMSRepository {
 
     private async getCooldownMariaDB(): Promise<number | null> {
         const [rows] = await this.getMariaPool().query<mysql.RowDataPacket[]>(
-            `SELECT param1 FROM CMS.TCS_CODE_COMPANY WHERE HCODE = ? AND DCODE = ?`,
+            `SELECT PARAM1
+               FROM CMS.TCS_CODE_COMPANY
+              WHERE HCODE = ?
+                AND DCODE = ?`,
             ['CPAM011', 'SYS72'],
         );
         const val = rows[0]?.param1;
@@ -102,9 +105,12 @@ class CMSRepository {
 
     private async getRecipientsMariaDB(): Promise<Recipient[]> {
         const [rows] = await this.getMariaPool().query<mysql.RowDataPacket[]>(
-            `SELECT DCODE, PARAM1, PARAM2
-       FROM CMS.TCS_CODE
-       WHERE HCODE = ? AND DCODE = ?`,
+            `SELECT DCODE
+                  , PARAM1
+                  , PARAM2
+               FROM CMS.TCS_CODE
+              WHERE HCODE = ?
+                AND DCODE = ?`,
             ['CPAM094', 'TEST'],
         );
         return this.rowsToRecipients(
@@ -136,7 +142,10 @@ class CMSRepository {
         const conn = await (await this.getOraPool()).getConnection();
         try {
             const result = await conn.execute(
-                `SELECT PARAM1 FROM CMS.TCS_CODE_COMPANY WHERE HCODE = :1 AND DCODE = :2`,
+                `SELECT PARAM1
+                   FROM CMS.TCS_CODE_COMPANY
+                  WHERE HCODE = :1
+                    AND DCODE = :2`,
                 ['CPAM011', 'SYS72'],
                 { outFormat: oracledb.OUT_FORMAT_OBJECT },
             );

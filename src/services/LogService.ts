@@ -4,6 +4,7 @@ import { toKST } from '../utils/dateUtils';
 import { LogEntry, LogPage } from '../types';
 import logger from '../config/logger';
 
+// TODO: 로그 수집 제공 서비스 명, 추후에 DB나 다른 설정으로 관리
 export const SERVICE_NAMES = [
     'was',
     'cxf',
@@ -27,8 +28,21 @@ const MAX_LIMIT = 200;
 
 class LogService {
     /**
+     * 
      * 서비스명 기반 로그 페이징 조회
+     * 
      * 인덱스: logs-{serviceName}-*
+     * 
+     * 이력사항
+     * 
+     * 2026.07.06 K.C.S 작성
+     * 
+     * @param serviceName 서비스 명
+     * @param timeRange 조회 시간 범위
+     * @param page 페이지 번호
+     * @param limit 페이지 당 조회 수
+     * @param levels 로그 레벨 (배열)
+     * @param keyword 검색 단어
      */
     async getServiceLogs(
         serviceName: string,
@@ -40,9 +54,7 @@ class LogService {
     ): Promise<LogPage> {
         const safeLimit = Math.min(limit, MAX_LIMIT);
         const safePage = Math.max(1, page);
-        const normalizedLevels = levels
-            ?.map((l) => l.toUpperCase())
-            .filter(Boolean);
+        const normalizedLevels = levels?.map((l) => l.toUpperCase()).filter(Boolean);
 
         try {
             const query = QueryBuilder.buildServiceLogs(
@@ -56,7 +68,7 @@ class LogService {
 
             const index = `logs-${serviceName}-*`;
             const response = await elasticsearchService.search(query, index);
-
+            
             const total =
                 typeof response.hits.total === 'number'
                     ? response.hits.total
@@ -74,17 +86,25 @@ class LogService {
                 totalPages: Math.ceil(total / safeLimit),
             };
         } catch (error) {
-            logger.error(
-                `Failed to get logs for service ${serviceName}:`,
-                error,
-            );
+            logger.error( `Failed to get logs for service ${serviceName}:`, error);
             throw error;
         }
     }
 
     /**
      * 특정 서버 IP/hostname 기준 로그 페이징 조회
+     * 
      * 인덱스: logs-*
+     * 
+     * 이력사항
+     * 
+     * 2026.07.06 K.C.S 작성
+     * 
+     * @param ip IP 주소
+     * @param timeRange 조회 시간 범위
+     * @param page 페이지 번호
+     * @param limit 페이지 당 조회 수
+     * @param levels 로그 레벨 (배열)
      */
     async getServerLogs(
         ip: string,
@@ -95,10 +115,8 @@ class LogService {
     ): Promise<LogPage> {
         const safeLimit = Math.min(limit, MAX_LIMIT);
         const safePage = Math.max(1, page);
-        const normalizedLevels = levels
-            ?.map((l) => l.toUpperCase())
-            .filter(Boolean);
-
+        const normalizedLevels = levels?.map((l) => l.toUpperCase()).filter(Boolean);
+        
         try {
             const query = QueryBuilder.buildServerLogs(
                 ip,
@@ -132,12 +150,16 @@ class LogService {
         }
     }
 
+    /**
+     * 
+     * @param s 
+     * @returns 
+     */
     private parseLogEntry(s: any): LogEntry {
         return {
             timestamp: toKST(s['@timestamp'] || ''),
             level: s.log_level || s['log.level'] || s.log?.level || '',
             message: s.message || '',
-            parsedMessage: s.log_message || undefined,
             logTime: s.log_time || undefined,
             service: s.service_name || undefined,
             module: s.log_module || undefined,
@@ -145,6 +167,7 @@ class LogService {
             jobId: s.log_job_id || undefined,
             hostname: s.host?.name || undefined,
             ip: this.extractIPv4(s.host?.ip),
+            logFilePath: s.log?.file?.path || undefined,
         };
     }
 

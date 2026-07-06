@@ -317,10 +317,10 @@ const options: swaggerJsdoc.Options = {
                             type: 'string',
                             example: 'Connection refused',
                         },
-                        parsedMessage: { type: 'string', nullable: true },
                         service: { type: 'string', nullable: true },
                         hostname: { type: 'string', nullable: true },
                         ip: { type: 'string', nullable: true },
+                        logFilePath: { type: 'string', nullable: true },
                     },
                 },
                 ApiError: {

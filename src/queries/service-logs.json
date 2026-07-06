@@ -22,7 +22,8 @@
       "log_instance",
       "log_job_id",
       "host.name",
-      "host.ip"
+      "host.ip",
+      "log.file.path"
     ]
   }
 }

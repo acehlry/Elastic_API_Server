@@ -111,7 +111,7 @@ router.get(
         if (!(SERVICE_NAMES as readonly string[]).includes(serviceName)) {
             return res.status(400).json({
                 success: false,
-                error: `지정되지 않은 서비스명 입니다. 전달받은 서비스 명: ${serviceName}. 사용가능한 서비스 목록: ${SERVICE_NAMES.join(', ')}`,
+                error: `Unknown service: ${serviceName}. Valid services: ${SERVICE_NAMES.join(', ')}`,
             });
         }
 
