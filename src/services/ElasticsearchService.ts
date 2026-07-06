@@ -19,8 +19,6 @@ class ElasticsearchService {
         try {
             const startTime = Date.now();
 
-            console.log('query:::', query)
-
             const response = await this.client.search({
                 index: index || this.indexPattern,
                 body: query,

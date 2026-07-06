@@ -91,64 +91,6 @@ class LogService {
         }
     }
 
-    /**
-     * 특정 서버 IP/hostname 기준 로그 페이징 조회
-     * 
-     * 인덱스: logs-*
-     * 
-     * 이력사항
-     * 
-     * 2026.07.06 K.C.S 작성
-     * 
-     * @param ip IP 주소
-     * @param timeRange 조회 시간 범위
-     * @param page 페이지 번호
-     * @param limit 페이지 당 조회 수
-     * @param levels 로그 레벨 (배열)
-     */
-    async getServerLogs(
-        ip: string,
-        timeRange: string = 'now-1h',
-        page: number = 1,
-        limit: number = 50,
-        levels?: string[],
-    ): Promise<LogPage> {
-        const safeLimit = Math.min(limit, MAX_LIMIT);
-        const safePage = Math.max(1, page);
-        const normalizedLevels = levels?.map((l) => l.toUpperCase()).filter(Boolean);
-        
-        try {
-            const query = QueryBuilder.buildServerLogs(
-                ip,
-                timeRange,
-                safePage,
-                safeLimit,
-                normalizedLevels?.length ? normalizedLevels : undefined,
-            );
-
-            const response = await elasticsearchService.search(query, 'logs-*');
-
-            const total =
-                typeof response.hits.total === 'number'
-                    ? response.hits.total
-                    : response.hits.total.value;
-
-            const logs: LogEntry[] = response.hits.hits.map((hit: any) =>
-                this.parseLogEntry(hit._source),
-            );
-
-            return {
-                logs,
-                total,
-                page: safePage,
-                limit: safeLimit,
-                totalPages: Math.ceil(total / safeLimit),
-            };
-        } catch (error) {
-            logger.error(`Failed to get logs for server ${ip}:`, error);
-            throw error;
-        }
-    }
 
     /**
      * 

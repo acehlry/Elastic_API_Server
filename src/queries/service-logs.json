@@ -18,9 +18,6 @@
       "log_message",
       "log_time",
       "service_name",
-      "log_module",
-      "log_instance",
-      "log_job_id",
       "host.name",
       "host.ip",
       "log.file.path"

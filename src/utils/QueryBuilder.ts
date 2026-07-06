@@ -180,31 +180,6 @@ export class QueryBuilder {
         ]);
     }
 
-    /**
-     * 다중 서버 메트릭 쿼리 빌드
-     */
-    static buildServerLogs(
-        ip: string,
-        timeRange: string,
-        page: number,
-        limit: number,
-        levels?: string[],
-    ): SearchQuery {
-        const mustClauses = [
-            this.mustClauses.rangeTime(timeRange),
-            this.mustClauses.term('host.ip', ip),
-        ];
-
-        if (levels && levels.length > 0) {
-            mustClauses.push(this.logLevelFilter(levels));
-        }
-
-        const query = this.build('server-logs', mustClauses);
-        query.size = limit;
-        query.from = (page - 1) * limit;
-        return query;
-    }
-
     static buildHeartbeatStatus(timeRange: string = 'now-5m'): SearchQuery {
         return this.build('heartbeat-status', [
             this.mustClauses.rangeTime(timeRange),
