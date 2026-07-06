@@ -1,4 +1,11 @@
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const TIME_UNIT_SECS: Record<string, number> = {
+    s: 1,
+    m: 60,
+    h: 3600,
+    d: 86400,
+    w: 604800,
+};
 
 /**
  * UTC 타임스탬프를 KST(+09:00)로 변환
@@ -21,14 +28,6 @@ export const epochToKST = (epochMs: number): string => {
     return new Date(epochMs + KST_OFFSET_MS)
         .toISOString()
         .replace('Z', '+09:00');
-};
-
-const TIME_UNIT_SECS: Record<string, number> = {
-    s: 1,
-    m: 60,
-    h: 3600,
-    d: 86400,
-    w: 604800,
 };
 
 /**

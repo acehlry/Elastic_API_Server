@@ -8,6 +8,22 @@ import {
 
 export class QueryBuilder {
     /**
+     * log_level 필터: keyword 매핑 방식에 따라 log_level.keyword / log_level 둘 다 시도
+     * log_level 값에 trailing space가 있어도 매칭되도록 should 구조 사용
+     */
+    static logLevelFilter(levels: string[]): MustClause {
+        return {
+            bool: {
+                should: [
+                    { terms: { 'log_level.keyword': levels } },
+                    { terms: { 'log_level': levels } },
+                ],
+                minimum_should_match: 1,
+            },
+        } as unknown as MustClause;
+    }
+
+    /**
      * Must 절 생성 헬퍼
      */
     static mustClauses = {
@@ -180,7 +196,7 @@ export class QueryBuilder {
         ];
 
         if (levels && levels.length > 0) {
-            mustClauses.push(this.mustClauses.terms('log_level.keyword', levels));
+            mustClauses.push(this.logLevelFilter(levels));
         }
 
         const query = this.build('server-logs', mustClauses);
@@ -236,7 +252,7 @@ export class QueryBuilder {
         ];
 
         if (levels && levels.length > 0) {
-            mustClauses.push(this.mustClauses.terms('log_level.keyword', levels));
+            mustClauses.push(this.logLevelFilter(levels));
         }
 
         if (keyword) {

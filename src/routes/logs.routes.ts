@@ -30,11 +30,11 @@ const router = Router();
  *                     total: { type: integer, example: 14 }
  */
 router.get('/services', (_req: Request, res: Response) => {
-  return res.json({
-    success: true,
-    data: [...SERVICE_NAMES],
-    meta: { total: SERVICE_NAMES.length }
-  } as ApiResponse);
+    return res.json({
+        success: true,
+        data: [...SERVICE_NAMES],
+        meta: { total: SERVICE_NAMES.length },
+    } as ApiResponse);
 });
 
 /**
@@ -103,40 +103,47 @@ router.get('/services', (_req: Request, res: Response) => {
  *               $ref: '#/components/schemas/ApiError'
  */
 router.get(
-  '/:serviceName',
-  asyncHandler(async (req: Request, res: Response) => {
-    const { serviceName } = req.params;
+    '/:serviceName',
+    asyncHandler(async (req: Request, res: Response) => {
+        const { serviceName } = req.params;
 
-    if (!(SERVICE_NAMES as readonly string[]).includes(serviceName)) {
-      return res.status(400).json({
-        success: false,
-        error: `Unknown service: ${serviceName}. Valid services: ${SERVICE_NAMES.join(', ')}`
-      });
-    }
+        // SEVICE_NAMES 배열에 servicename이 있는지 판별
+        if (!(SERVICE_NAMES as readonly string[]).includes(serviceName)) {
+            return res.status(400).json({
+                success: false,
+                error: `지정되지 않은 서비스명 입니다. 전달받은 서비스 명: ${serviceName}. 사용가능한 서비스 목록: ${SERVICE_NAMES.join(', ')}`,
+            });
+        }
 
-    const timeRange = (req.query.timeRange as string) || 'now-1h';
-    const page      = parseInt(req.query.page  as string) || 1;
-    const limit     = parseInt(req.query.limit as string) || 50;
-    const keyword   = (req.query.keyword as string) || undefined;
-    const levels    = (req.query.level as string)
-      ?.split(',').map(l => l.trim()).filter(Boolean);
+        const timeRange = (req.query.timeRange as string) || 'now-1h';
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 50;
+        const keyword = (req.query.keyword as string) || undefined;
+        const levels = (req.query.level as string)
+            ?.split(',')
+            .map((l) => l.trim())
+            .filter(Boolean);
+        const result = await logService.getServiceLogs(
+            serviceName,
+            timeRange,
+            page,
+            limit,
+            levels,
+            keyword,
+        );
 
-    const result = await logService.getServiceLogs(
-      serviceName, timeRange, page, limit, levels, keyword
-    );
-
-    return res.json({
-      success: true,
-      data: result.logs,
-      meta: {
-        total:       result.total,
-        page:        result.page,
-        limit:       result.limit,
-        totalPages:  result.totalPages,
-        serviceName,
-      }
-    } as ApiResponse);
-  })
+        return res.json({
+            success: true,
+            data: result.logs,
+            meta: {
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+                totalPages: result.totalPages,
+                serviceName,
+            },
+        } as ApiResponse);
+    }),
 );
 
 /**
@@ -187,37 +194,41 @@ router.get(
  *         description: 유효하지 않은 서비스명
  */
 router.get(
-  '/:serviceName/errors',
-  asyncHandler(async (req: Request, res: Response) => {
-    const { serviceName } = req.params;
+    '/:serviceName/errors',
+    asyncHandler(async (req: Request, res: Response) => {
+        const { serviceName } = req.params;
 
-    if (!(SERVICE_NAMES as readonly string[]).includes(serviceName)) {
-      return res.status(400).json({
-        success: false,
-        error: `Unknown service: ${serviceName}. Valid services: ${SERVICE_NAMES.join(', ')}`
-      });
-    }
+        if (!(SERVICE_NAMES as readonly string[]).includes(serviceName)) {
+            return res.status(400).json({
+                success: false,
+                error: `Unknown service: ${serviceName}. Valid services: ${SERVICE_NAMES.join(', ')}`,
+            });
+        }
 
-    const timeRange = (req.query.timeRange as string) || 'now-1h';
-    const page      = parseInt(req.query.page  as string) || 1;
-    const limit     = parseInt(req.query.limit as string) || 50;
+        const timeRange = (req.query.timeRange as string) || 'now-1h';
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 50;
 
-    const result = await logService.getServiceLogs(
-      serviceName, timeRange, page, limit, ['ERROR', 'WARN', 'ERR']
-    );
+        const result = await logService.getServiceLogs(
+            serviceName,
+            timeRange,
+            page,
+            limit,
+            ['ERROR', 'WARN', 'ERR'],
+        );
 
-    return res.json({
-      success: true,
-      data: result.logs,
-      meta: {
-        total:       result.total,
-        page:        result.page,
-        limit:       result.limit,
-        totalPages:  result.totalPages,
-        serviceName,
-      }
-    } as ApiResponse);
-  })
+        return res.json({
+            success: true,
+            data: result.logs,
+            meta: {
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+                totalPages: result.totalPages,
+                serviceName,
+            },
+        } as ApiResponse);
+    }),
 );
 
 export default router;
