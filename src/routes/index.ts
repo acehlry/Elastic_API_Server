@@ -26,11 +26,7 @@ const router = Router();
  *                 timestamp: { type: string, example: '2026-05-27T18:42:46.644+09:00' }
  */
 router.get('/health', (_req, res) => {
-  res.json({
-    success: true,
-    message: 'Metrics API is running',
-    timestamp: new Date().toISOString()
-  });
+  res.json({ success: true, message: 'Metrics API is running', timestamp: new Date().toISOString() });
 });
 
 // Routes

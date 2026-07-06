@@ -60,25 +60,15 @@ class Server {
 
         // Request logging
         this.app.use((req: Request, _res: Response, next: NextFunction) => {
-            logger.info(`${req.method} ${req.path}`, {
-                query: req.query,
-                ip: req.ip,
-            });
-
+            logger.info(`${req.method} ${req.path}`, { query: req.query, ip: req.ip });
             next();
         });
     }
 
     private initializeRoutes(): void {
         // Swagger UI
-        this.app.use(
-            '/api-docs',
-            swaggerUi.serve,
-            swaggerUi.setup(swaggerSpec),
-        );
-        this.app.get('/api-docs.json', (_req: Request, res: Response) => {
-            res.json(swaggerSpec);
-        });
+        this.app.use( '/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+        this.app.get('/api-docs.json', (_req: Request, res: Response) => { res.json(swaggerSpec); });
 
         // API routes
         this.app.use('/api', routes);
@@ -119,9 +109,7 @@ class Server {
 
             this.app.listen(this.port, () => {
                 logger.info(`🚀 Server running on port ${this.port}`);
-                logger.info(
-                    `📊 Environment: ${process.env.NODE_ENV || 'development'}`,
-                );
+                logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
                 logger.info(`🔍 Elasticsearch: ${process.env.ES_NODE}`);
                 logger.info(`📡 API: http://localhost:${this.port}/api`);
             });

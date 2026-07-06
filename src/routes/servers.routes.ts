@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import metricsService from '../services/MetricsService';
-import logService from '../services/LogService';
 import { asyncHandler } from '../middleware/errorHandler';
 import {
   validateTimeSeries,
