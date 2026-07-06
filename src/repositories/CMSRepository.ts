@@ -47,7 +47,8 @@ class CMSRepository {
 
     // ────────────────────────────────────────────
     // 알람 수신자 조회
-    // CMS.TCS_CODE WHERE HCODE='CPAM094' AND DCODE='TEST'
+    // MariaDB: CMS.TCS_CODE WHERE HCODE='CPAM094' AND DCODE='TEST'
+    // Oracle:  CMS.TCS_CODE_COMPANY WHERE HCODE='CPAM094' AND DCODE='TEST'
     // PARAM1: 핸드폰 번호 / PARAM2: 이메일
     // 추후 DCODE 조건 제거 → 시스템별 다수 담당자로 확장 예정
     // ────────────────────────────────────────────

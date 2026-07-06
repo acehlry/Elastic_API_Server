@@ -4,17 +4,14 @@ import notificationService from './NotificationService';
 import cmsRepository from '../repositories/CMSRepository';
 import logger from '../config/logger';
 import { toKST } from '../utils/dateUtils';
+import serviceConfigData from '../config/alert-services.json';
 
-const DEFAULT_INDICES = [
-  'logs-was-*',
-  'logs-cxf-*',
-  'logs-ingest_system_error-*',
-  'logs-playout_system_error-*',
-  'logs-system_manager-*',
-  'logs-imedia_processor-*',
-];
-
-const ALERT_LEVELS = ['ERROR', 'ERR'];
+export interface ServiceAlertConfig {
+  name:     string;
+  index:    string;
+  levels:   string[];
+  keywords: string[];
+}
 
 interface ErrorLog {
   timestamp:       string;
@@ -47,9 +44,7 @@ export interface AlertStatus {
   cooldownCount:  number;
   pollIntervalMs: number;
   cooldownMs:     number;
-  indices:        string[];
-  alertLevels:    string[];
-  keywords:       string[];
+  services:       ServiceAlertConfig[];
 }
 
 class AlertMonitorService {
@@ -71,32 +66,27 @@ class AlertMonitorService {
 
   private readonly pollIntervalMs: number;
   private cooldownMs: number;
-  private readonly indices: string[];
-  private readonly keywords: string[];
+  private readonly serviceConfigs: ServiceAlertConfig[];
 
   constructor() {
-    this.pollIntervalMs = parseInt(process.env.ALERT_POLL_MS || '30000');
-    this.cooldownMs     = 3600000;  // DB 로드 전 기본값 (1시간)
-    this.indices = process.env.ALERT_INDICES
-      ? process.env.ALERT_INDICES.split(',').map(s => s.trim())
-      : DEFAULT_INDICES;
-    this.keywords = (process.env.ALERT_KEYWORDS || '')
-      .split(',').map(k => k.trim()).filter(Boolean);
+    this.pollIntervalMs  = parseInt(process.env.ALERT_POLL_MS || '30000');
+    this.cooldownMs      = 3600000;
+    this.serviceConfigs  = serviceConfigData.services as ServiceAlertConfig[];
   }
 
   async start(): Promise<void> {
     if (this.isRunning) return;
 
-    // DB에서 쿨다운 설정 로드
     this.cooldownMs = await cmsRepository.getCooldownMs();
 
     this.isRunning = true;
     this.schedule();
     logger.info(`[AlertMonitor] 시작 (폴링: ${this.pollIntervalMs}ms, 쿨다운: ${this.cooldownMs}ms)`);
-    logger.info(`[AlertMonitor] 레벨: ${ALERT_LEVELS.join(', ')}`);
-    if (this.keywords.length > 0) {
-      logger.info(`[AlertMonitor] 키워드: ${this.keywords.join(', ')}`);
-    }
+    logger.info(`[AlertMonitor] 감시 서비스 ${this.serviceConfigs.length}개:`);
+    this.serviceConfigs.forEach(s => {
+      const kw = s.keywords.length ? ` | 키워드: ${s.keywords.join(', ')}` : '';
+      logger.info(`  - ${s.name} → 레벨: ${s.levels.join('/')}${kw}`);
+    });
   }
 
   stop(): void {
@@ -115,10 +105,12 @@ class AlertMonitorService {
       cooldownCount:  this.cooldowns.size,
       pollIntervalMs: this.pollIntervalMs,
       cooldownMs:     this.cooldownMs,
-      indices:        this.indices,
-      alertLevels:    ALERT_LEVELS,
-      keywords:       this.keywords,
+      services:       this.serviceConfigs,
     };
+  }
+
+  getServiceConfigs(): ServiceAlertConfig[] {
+    return this.serviceConfigs;
   }
 
   getCooldowns(): CooldownEntry[] {
@@ -172,19 +164,25 @@ class AlertMonitorService {
   }
 
   private async fetchErrors(since: Date): Promise<ErrorLog[]> {
-    // should: 레벨 조건 OR 키워드 조건 중 하나라도 일치하면 감지
-    // log_level.keyword (text+keyword 매핑) 와 log_level (keyword 직접 매핑) 둘 다 시도
-    const shouldClauses: any[] = [
-      { terms: { 'log_level.keyword': ALERT_LEVELS } },
-      { terms: { 'log_level':         ALERT_LEVELS } },
-      ...this.keywords.map(kw => ({
-        multi_match: {
-          query:  kw,
-          fields: ['log_message', 'message'],
-          type:   'phrase',
-        },
-      })),
-    ];
+    // 서비스별로 독립적인 조건 빌드:
+    // 각 서비스는 자신의 service_name 필터 + (레벨 OR 키워드) 조건을 가짐
+    const shouldClauses = this.serviceConfigs.map(svc => ({
+      bool: {
+        filter: [{ term: { service_name: svc.name } }],
+        should: [
+          { terms: { 'log_level.keyword': svc.levels } },
+          { terms: { 'log_level':         svc.levels } },
+          ...svc.keywords.map(kw => ({
+            multi_match: {
+              query:  kw,
+              fields: ['log_message', 'message'],
+              type:   'phrase',
+            },
+          })),
+        ],
+        minimum_should_match: 1,
+      },
+    }));
 
     const query = {
       size: 100,
@@ -199,32 +197,43 @@ class AlertMonitorService {
       },
       sort: [{ '@timestamp': { order: 'asc' as const } }],
       _source: {
-        includes: ['@timestamp', 'message', 'log_message', 'log_level', 'service_name', 'host.name', 'host.ip'],
+        includes: [
+          '@timestamp', 'message', 'log_message', 'log_level',
+          'service_name', 'host.name', 'host.ip',
+        ],
       },
     };
 
-    const response = await elasticsearchService.search(query as any, this.indices.join(','));
+    const indices  = this.serviceConfigs.map(s => s.index).join(',');
+    const response = await elasticsearchService.search(query as any, indices);
 
     return response.hits.hits.map((hit: any) => {
-      const s = hit._source;
-      const body = s.log_message || s.message || '';
+      const s           = hit._source;
+      const body        = s.log_message || s.message || '';
+      const serviceName = (s.service_name || '') as string;
+      const svcConfig   = this.serviceConfigs.find(c => c.name === serviceName);
+
       return {
-        timestamp:      s['@timestamp']        || '',
-        hostname:       s.host?.name           || 'unknown',
+        timestamp:      s['@timestamp']              || '',
+        hostname:       s.host?.name                 || 'unknown',
         ip:             this.extractIPv4(s.host?.ip),
-        service:        s.service_name         || '',
+        service:        serviceName,
         level:          (s.log_level || '').trim(),
-        message:        s.message              || '',
-        parsedMessage:  s.log_message          || undefined,
-        matchedKeyword: this.findMatchedKeyword(body),
+        message:        s.message                    || '',
+        parsedMessage:  s.log_message                || undefined,
+        matchedKeyword: svcConfig
+          ? this.findMatchedKeyword(body, svcConfig.keywords)
+          : undefined,
       };
     });
   }
 
   private async handleError(err: ErrorLog): Promise<void> {
     const normalized = this.normalizeMessage(err.parsedMessage || err.message);
-    const key = this.buildKey(err.hostname, normalized);
-    const now = Date.now();
+    // 쿨다운 키: 호스트 + 서비스 + 정규화된 메시지
+    // → 다른 서비스의 동일 에러는 별도 알람, 같은 서비스 내 동일 에러는 억제
+    const key     = this.buildKey(err.hostname, err.service, normalized);
+    const now     = Date.now();
     const existing = this.cooldowns.get(key);
 
     if (existing && existing.expiresAt > now) {
@@ -235,7 +244,11 @@ class AlertMonitorService {
     }
 
     const suppressedCount = existing?.suppressedCount ?? 0;
-    const isLevelTrigger  = ALERT_LEVELS.includes(err.level.toUpperCase());
+    const isLevelTrigger  = (() => {
+      const svcConfig = this.serviceConfigs.find(c => c.name === err.service);
+      const levels    = svcConfig?.levels ?? ['ERROR', 'ERR'];
+      return levels.includes(err.level.toUpperCase());
+    })();
     const triggerType: 'level' | 'keyword' = isLevelTrigger ? 'level' : 'keyword';
 
     this.cooldowns.set(key, {
@@ -260,7 +273,7 @@ class AlertMonitorService {
     suppressedCount: number,
     triggerType: 'level' | 'keyword',
   ): string {
-    const tag = triggerType === 'keyword'
+    const tag      = triggerType === 'keyword'
       ? `[키워드: ${err.matchedKeyword}]`
       : `[${err.level}]`;
 
@@ -272,18 +285,10 @@ class AlertMonitorService {
     return `${tag}\n서비스: ${err.service}\n호스트: ${hostLine}\n내용: ${truncated}${suppressed}`;
   }
 
-  /** host.ip 배열 또는 문자열에서 IPv4 주소 반환 */
-  private extractIPv4(raw: string | string[] | undefined): string | undefined {
-    if (!raw) return undefined;
-    const list = Array.isArray(raw) ? raw : [raw];
-    const ipv4  = list.find(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
-    return ipv4;
-  }
-
-  /** 메시지에서 설정된 키워드 중 첫 번째 일치 항목 반환 */
-  private findMatchedKeyword(text: string): string | undefined {
+  /** 서비스별 키워드 목록에서 첫 번째 매칭 키워드 반환 */
+  private findMatchedKeyword(text: string, keywords: string[]): string | undefined {
     const lower = text.toLowerCase();
-    return this.keywords.find(kw => lower.includes(kw.toLowerCase()));
+    return keywords.find(kw => lower.includes(kw.toLowerCase()));
   }
 
   /** 타임스탬프·UUID·숫자ID를 제거하여 동일 에러 패턴 식별에 사용 */
@@ -297,11 +302,19 @@ class AlertMonitorService {
       .trim();
   }
 
-  private buildKey(hostname: string, normalizedMessage: string): string {
+  /** 쿨다운 키: 호스트 + 서비스 + 정규화 메시지 조합 */
+  private buildKey(hostname: string, service: string, normalizedMessage: string): string {
     return crypto
       .createHash('md5')
-      .update(`${hostname}::${normalizedMessage}`)
+      .update(`${hostname}::${service}::${normalizedMessage}`)
       .digest('hex');
+  }
+
+  /** host.ip 배열 또는 문자열에서 IPv4 주소 반환 */
+  private extractIPv4(raw: string | string[] | undefined): string | undefined {
+    if (!raw) return undefined;
+    const list = Array.isArray(raw) ? raw : [raw];
+    return list.find(ip => /^\d+\.\d+\.\d+\.\d+$/.test(ip));
   }
 }
 

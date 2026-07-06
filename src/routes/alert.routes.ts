@@ -195,9 +195,13 @@ router.post(
 router.get(
   '/peek',
   asyncHandler(async (req: Request, res: Response) => {
-    const timeRange = (req.query.timeRange as string) || 'now-5m';
-    const status    = alertMonitor.getStatus();
-    const index     = (req.query.index as string) || status.indices.join(',');
+    const timeRange    = (req.query.timeRange as string) || 'now-5m';
+    const status       = alertMonitor.getStatus();
+    const serviceFilter = req.query.service as string | undefined;
+    const services     = serviceFilter
+      ? status.services.filter(s => s.name === serviceFilter)
+      : status.services;
+    const index        = (req.query.index as string) || services.map(s => s.index).join(',');
 
     // 1. 필터 없이 최근 문서 5건 (log_level 필드 실제 값 확인용)
     const rawQuery: any = {
@@ -207,20 +211,28 @@ router.get(
       _source: { includes: ['@timestamp', 'log_level', 'log.level', 'message', 'log_message', 'service_name', 'host.name'] },
     };
 
-    // 2. 실제 알람 쿼리 (레벨 + 키워드 조건)
+    // 2. 실제 알람 쿼리 — 서비스별 독립 조건 (fetchErrors와 동일한 구조)
+    const shouldClauses = services.map(svc => ({
+      bool: {
+        filter: [{ term: { service_name: svc.name } }],
+        should: [
+          { terms: { 'log_level.keyword': svc.levels } },
+          { terms: { 'log_level':         svc.levels } },
+          ...svc.keywords.map((kw: string) => ({
+            multi_match: { query: kw, fields: ['log_message', 'message'], type: 'phrase' },
+          })),
+        ],
+        minimum_should_match: 1,
+      },
+    }));
+
     const alertQuery: any = {
       size: 5,
       sort: [{ '@timestamp': { order: 'desc' } }],
       query: {
         bool: {
           must: [{ range: { '@timestamp': { gte: timeRange } } }],
-          should: [
-            { terms: { 'log_level.keyword': ['ERROR', 'ERR'] } },
-            { terms: { 'log_level':         ['ERROR', 'ERR'] } },   // keyword 타입 필드 대응
-            ...status.keywords.map((kw: string) => ({
-              multi_match: { query: kw, fields: ['log_message', 'message'], type: 'phrase' },
-            })),
-          ],
+          should:               shouldClauses,
           minimum_should_match: 1,
         },
       },
@@ -253,6 +265,7 @@ router.get(
       data: {
         index,
         timeRange,
+        services: services.map(s => ({ name: s.name, levels: s.levels, keywords: s.keywords })),
         raw: {
           total: typeof rawRes.hits.total === 'number' ? rawRes.hits.total : rawRes.hits.total?.value,
           docs:  rawDocs,
@@ -261,7 +274,7 @@ router.get(
           total: typeof alertRes.hits.total === 'number' ? alertRes.hits.total : alertRes.hits.total?.value,
           docs:  alertDocs,
           note:  alertDocs.length === 0
-            ? '알람 쿼리(log_level=ERROR/ERR 또는 키워드) 결과 없음 → 필드명·값 확인 필요'
+            ? '알람 쿼리 결과 없음 → service_name 필드·log_level 값 확인 필요'
             : '이 문서들이 다음 폴링에서 알람 대상',
         },
       }

@@ -1,0 +1,74 @@
+{
+    "services": [
+        {
+            "name": "was",
+            "index": "logs-was-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": [
+                "OutOfMemoryError",
+                "NullPointerException",
+                "Connection refused"
+            ]
+        },
+        {
+            "name": "cxf",
+            "index": "logs-cxf-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": []
+        },
+        {
+            "name": "ingest_cms",
+            "index": "logs-ingest_cms-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": ["no_signal"]
+        },
+        {
+            "name": "ingest_cmslocal",
+            "index": "logs-ingest_cmslocal-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": ["no_signal"]
+        },
+        {
+            "name": "ingest_system",
+            "index": "logs-ingest_system-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": ["no_signal"]
+        },
+        {
+            "name": "ingest_nosignal",
+            "index": "logs-ingest_nosignal-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": ["no_signal"]
+        },
+        {
+            "name": "ingest_system_error",
+            "index": "logs-ingest_system_error-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": ["no_signal"]
+        },
+        {
+            "name": "playout_system",
+            "index": "logs-playout_system-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": ["ERROR"]
+        },
+        {
+            "name": "playout_system_error",
+            "index": "logs-playout_system_error-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": ["ERROR"]
+        },
+        {
+            "name": "system_manager",
+            "index": "logs-system_manager-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": []
+        },
+        {
+            "name": "imedia_processor",
+            "index": "logs-imedia_processor-*",
+            "levels": ["ERROR", "ERR"],
+            "keywords": []
+        }
+    ]
+}

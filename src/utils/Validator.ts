@@ -3,7 +3,9 @@ import { QueryParams } from '../types';
 
 const schemas = {
     timeSeries: Joi.object({
-        ip: Joi.string().ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' }).required(),
+        ip: Joi.string()
+            .ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' })
+            .required(),
         timeRange: Joi.string()
             .pattern(/^now-\d+[mhd]$/)
             .default('now-1h'),
@@ -13,7 +15,9 @@ const schemas = {
     }),
 
     serverMetrics: Joi.object({
-        ip: Joi.string().ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' }).required(),
+        ip: Joi.string()
+            .ip({ version: ['ipv4', 'ipv6'], cidr: 'forbidden' })
+            .required(),
     }),
 
     anomalyDetection: Joi.object({
@@ -34,6 +38,9 @@ export class ValidationError extends Error {
     }
 }
 
+/**
+ * 유효성 체크
+ */
 export class Validator {
     static validate<T>(schema: Joi.ObjectSchema, data: any): T {
         const { error, value } = schema.validate(data, {
